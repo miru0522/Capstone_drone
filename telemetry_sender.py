@@ -86,7 +86,7 @@ def read_status_state() -> dict:
         with open(STATUS_STATE_PATH, "r") as f:
             return json.load(f)
     except Exception:
-        return {"status": "IDLE", "currentAction": None}
+        return {"status": "IDLE", "currentAction": None, "hasRoute": False}
 
 
 class TelemetrySender:
@@ -228,6 +228,7 @@ class TelemetrySender:
                 "droneId": DRONE_ID,
                 "status": status_info.get("status", "IDLE"),
                 "currentAction": status_info.get("currentAction"),
+                "hasRoute": bool(status_info.get("hasRoute", False)),
                 "gps": {
                     "lat_deg": self.state["lat"],
                     "lon_deg": self.state["lon"],

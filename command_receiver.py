@@ -286,10 +286,22 @@ class DroneCommandHandler:
         asyncio.create_task(self._land())
 
     def _write_status_state(self, current_action: Optional[str] = None):
-        """telemetry_sender.py가 읽어갈 상태 공유 파일 갱신."""
+        """telemetry_sender.py가 읽어갈 상태 공유 파일 갱신.
+
+        ★2026-08-26: hasRoute 추가. 서버 Telemetry.java의 GET /{droneId}/route
+        주석에 "실제 보유 여부는 텔레메트리의 hasRoute가 진실"이라고 명시돼
+        있는데, 드론이 이 필드를 아예 안 보내고 있었음(프론트는 ?? true로
+        안전 폴백하고 있어 크래시는 없었지만, 경로 없을 때 재개를 막는
+        안전장치가 사실상 무력화돼 있었음). self._route가 곧 드론이 실제로
+        들고 있는 경로이므로 그대로 반영.
+        """
         try:
             with open(STATUS_STATE_PATH, "w") as f:
-                json.dump({"status": self._status, "currentAction": current_action}, f)
+                json.dump({
+                    "status": self._status,
+                    "currentAction": current_action,
+                    "hasRoute": bool(self._route),
+                }, f)
         except Exception as e:
             logger.debug(f"상태 공유 파일 쓰기 실패: {e}")
 
