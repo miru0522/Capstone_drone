@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@layer base {
+
+  body {
+    font-family: 'Inter', sans-serif;
+  }
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  }
+
+  /* 스크롤바 — 사이드탭·HISTORY 패널 등 넘치는 영역 전체에 적용된다.
+     webkit 계열만 쓰면 Firefox에서 효과가 없어 표준 속성을 함께 둔다. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #7dd3fc transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #7dd3fc;
+    border-radius: 10px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #38bdf8;
+  }
+
+  /* 브라우저 기본 비밀번호 눈동자 아이콘 제거 (Edge 등) */
+  input[type="password"]::-ms-reveal,
+  input[type="password"]::-ms-clear {
+    display: none;
+  }
+
+  /* 로고 호버·클릭 시 전체 인트로 시퀀스를 재생한다.
+     :hover로 걸면 마우스를 떼는 순간 잘리므로, Header.jsx가 클래스를 직접 붙였다 뗀다. */
+  .logo-home .logo-mark {
+    transform-origin: center;
+  }
+
+  /* 로고 첫 등장 — add_logo_v1_inverted.html의 3단 시퀀스를 옮긴 것.
+     ① 마크 확대+360° 회전 → ② 워드마크 좌→우 와이프 → ③ 부제 페이드.
+     animation-fill-mode를 backwards로 둔다. 지연 구간에는 시작 상태를 유지하고,
+     끝나면 요소 본래 스타일(보이는 상태)로 돌아간다. forwards나 base opacity:0을 쓰면
+     애니메이션이 실행되지 않는 환경에서 글자가 영영 안 보인다. */
+  .logo-intro .logo-mark { animation: logoMarkIntro 1.1s cubic-bezier(.2, .7, .2, 1) backwards; }
+  .logo-intro .logo-word { animation: logoWordIntro 0.6s cubic-bezier(.2, .7, .2, 1) 0.95s backwards; }
+  .logo-intro .logo-sub  { animation: logoSubIntro 0.5s ease 1.45s backwards; }
+
+  @keyframes logoMarkIntro {
+    0%   { opacity: 0; transform: scale(.45) rotate(0deg); }
+    26%  { opacity: 1; transform: scale(1) rotate(0deg); }
+    100% { opacity: 1; transform: scale(1) rotate(360deg); }
+  }
+  @keyframes logoWordIntro {
+    from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(-14px); }
+    to   { opacity: 1; clip-path: inset(0 0 0 0);   transform: translateX(0); }
+  }
+  @keyframes logoSubIntro {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .logo-intro .logo-mark,
+    .logo-intro .logo-word,
+    .logo-intro .logo-sub { animation: none; }
+  }
+}

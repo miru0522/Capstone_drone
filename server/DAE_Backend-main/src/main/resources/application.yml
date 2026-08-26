@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: drone-backend
+  servlet:
+    multipart:
+      max-file-size: 200MB
+      max-request-size: 200MB
+  mvc:
+    async:
+      # MJPEG 중계(StreamingResponseBody)는 몇 분씩 열려 있다.
+      # 기본값이면 컨테이너 비동기 타임아웃(30초)에 걸려 화면이 끊긴다.
+      request-timeout: -1
+  profiles:
+    include: secret
+
+server:
+  port: 8080
+  ssl:
+    enabled: true
+    key-store: classpath:keystore.p12
+    # 값은 application-secret.yml(gitignore 대상)에 둔다. 여기 직접 적으면 저장소에 올라간다.
+    key-store-password: ${keystore.password}
+    key-store-type: PKCS12
+    enabled-protocols: TLSv1.2,TLSv1.3
+
+logging:
+  level:
+    org.springframework.web.socket: DEBUG
+
+jwt:
+  # secret is injected from application-secret.yml (gitignored)
+  expiration: 86400000
+
+app:
+  telemetry:
+    retention:
+      enabled: true
+      days: 90
+  video:
+    storage-dir: ./videodata
+  profile:
+    # 프로필 사진 저장 위치. 컨테이너 재생성 시 사라지지 않도록 compose에서 볼륨으로 마운트한다.
+    storage-dir: ./profiledata
+  ai-server:
+    base-url: http://ai_server:8000
+  cors:
+    allowed-origins: "http://203.249.90.3:8031,https://203.249.90.3:8031,http://203.249.90.3,https://203.249.90.3"
+
+osrm:
+  base-url: http://router.project-osrm.org

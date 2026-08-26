@@ -1,0 +1,57 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+}
+
+group = 'com.drone'
+version = '1.0.0'
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+    implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
+    implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
+    implementation 'jakarta.annotation:jakarta.annotation-api:2.1.1'
+    compileOnly 'org.projectlombok:lombok'
+
+    implementation 'org.mariadb.jdbc:mariadb-java-client:3.3.3'
+
+    runtimeOnly 'org.mariadb.jdbc:mariadb-java-client'
+    annotationProcessor 'org.projectlombok:lombok'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+
+    // 고도 가져오기 API
+    // implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.17.0'
+
+    // 길찾기
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Actuator 사용
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // @Valid, @NotBlank 등 DTO 검증
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

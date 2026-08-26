@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    driver-class-name: org.mariadb.jdbc.Driver
+    username: ${DB_SPRING_USER}
+    password: ${DB_SPRING_PASSWORD}
+  jpa:
+    database-platform: org.hibernate.dialect.MariaDBDialect
+    hibernate:
+      ddl-auto: update      # 최초 스키마 생성까지만. 안정화 후 validate 전환
+    show-sql: false
+
+app:
+  # 기본값을 두지 않는다. 여기 적으면 인증키가 저장소에 그대로 남는다.
+  device-keys: ${APP_DEVICE_KEYS}

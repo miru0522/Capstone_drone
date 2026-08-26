@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+
+<html class="light" lang="ko"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>DRONE-VIEW | Control Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "inverse-on-surface": "#eaf1ff",
+                        "surface-bright": "#f8f9ff",
+                        "inverse-surface": "#213145",
+                        "error-container": "#ffdad6",
+                        "on-surface-variant": "#424754",
+                        "primary-fixed-dim": "#adc6ff",
+                        "on-secondary": "#ffffff",
+                        "secondary-fixed": "#dae2fd",
+                        "surface-tint": "#005ac2",
+                        "surface-container-low": "#eff4ff",
+                        "on-tertiary-fixed": "#311400",
+                        "on-background": "#0b1c30",
+                        "secondary": "#565e74",
+                        "error": "#ba1a1a",
+                        "secondary-container": "#dae2fd",
+                        "surface-container": "#e5eeff",
+                        "on-primary-container": "#fefcff",
+                        "on-secondary-fixed": "#131b2e",
+                        "primary-container": "#2170e4",
+                        "on-tertiary-fixed-variant": "#723600",
+                        "tertiary-container": "#b75b00",
+                        "on-tertiary-container": "#fffbff",
+                        "outline": "#727785",
+                        "on-tertiary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed-variant": "#3f465c",
+                        "surface": "#f8f9ff",
+                        "on-primary-fixed-variant": "#004395",
+                        "on-surface": "#0b1c30",
+                        "primary": "#0058be",
+                        "surface-container-lowest": "#ffffff",
+                        "secondary-fixed-dim": "#bec6e0",
+                        "tertiary": "#924700",
+                        "on-primary": "#ffffff",
+                        "background": "#f8f9ff",
+                        "surface-variant": "#d3e4fe",
+                        "inverse-primary": "#adc6ff",
+                        "on-error-container": "#93000a",
+                        "outline-variant": "#c2c6d6",
+                        "surface-dim": "#cbdbf5",
+                        "surface-container-high": "#dce9ff",
+                        "on-secondary-container": "#5c647a",
+                        "tertiary-fixed-dim": "#ffb786",
+                        "surface-container-highest": "#d3e4fe",
+                        "tertiary-fixed": "#ffdcc6",
+                        "on-primary-fixed": "#001a42",
+                        "primary-fixed": "#d8e2ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "max-width": "1440px",
+                        "base": "4px",
+                        "margin-desktop": "32px",
+                        "gutter": "20px",
+                        "margin-mobile": "16px",
+                        "lg": "24px",
+                        "md": "16px",
+                        "sm": "8px",
+                        "xs": "4px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "body-md": ["Inter"],
+                        "title-lg": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "display-lg": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "mono-data": ["Inter"],
+                        "label-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "title-lg": ["20px", {"lineHeight": "28px", "fontWeight": "600"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "mono-data": ["14px", {"lineHeight": "20px", "letterSpacing": "-0.01em", "fontWeight": "500"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-tab {
+            font-variation-settings: 'FILL' 1;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body-md overflow-hidden h-screen flex flex-col">
+<!-- TopNavBar -->
+<header class="bg-surface shadow-sm flex justify-between items-center w-full px-margin-desktop h-20 z-50">
+<div class="flex items-center gap-md">
+<h1 class="font-display-lg text-display-lg font-bold tracking-tight text-primary">DRONE-VIEW</h1>
+<nav class="hidden md:flex ml-xl items-center gap-lg">
+<a class="text-primary border-b-2 border-primary font-label-md text-label-md py-sm" href="#">DASHBOARD</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-md text-label-md py-sm px-md rounded-lg" href="#">FLEET</a>
+<a class="text-on-surface-variant hover:bg-surface-container-low transition-colors font-label-md text-label-md py-sm px-md rounded-lg" href="#">ANALYTICS</a>
+</nav>
+</div>
+<div class="flex items-center gap-md">
+<button class="material-symbols-outlined p-sm text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors cursor-pointer active:scale-95 duration-200" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined p-sm text-on-surface-variant hover:bg-surface-container-low rounded-full transition-colors cursor-pointer active:scale-95 duration-200" data-icon="settings">settings</button>
+<div class="w-10 h-10 rounded-full overflow-hidden border border-outline-variant ml-sm">
+<img alt="Operator Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyC01SrdA9CihGg4hlWl_rJL05t54ZO6_yna5G7VUjKyPwO5f6Is-NUPVt62TNCzV9kSeryVd4lQrLGpFelk1kBQoIIrU03T9yVc5KgljOEoVr-eI_hr3BBG9otYDyDKO-utj4LhSB2f_htNQgljgdayECrof7M9QeCaM95g8M_JlItyys6S9UX0QyeabTVLVMsYYp_hWnQFExbYCZz6lRy1_SMjCS91dxinaQp18Z-yHJeP63iZJoFstQbPS009gyjLOPQV3SP2s"/>
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="hidden md:flex flex-col h-full w-[280px] py-lg px-md gap-sm bg-surface-bright border-r border-outline-variant">
+<div class="px-md mb-lg">
+<h2 class="font-title-lg text-title-lg text-primary">System Active</h2>
+<p class="font-label-md text-label-md text-on-surface-variant">All units online</p>
+</div>
+<nav class="flex-1 flex flex-col gap-xs">
+<button class="flex items-center gap-md p-md w-full text-left bg-secondary-container text-on-secondary-container rounded-lg transition-transform duration-200 active:translate-x-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-label-md text-label-md">Fleet</span>
+</button>
+<button class="flex items-center gap-md p-md w-full text-left text-on-surface-variant hover:bg-surface-container transition-all transition-transform duration-200 active:translate-x-1">
+<span class="material-symbols-outlined">sensors</span>
+<span class="font-label-md text-label-md">Sensors</span>
+</button>
+<button class="flex items-center gap-md p-md w-full text-left text-on-surface-variant hover:bg-surface-container transition-all transition-transform duration-200 active:translate-x-1">
+<span class="material-symbols-outlined">near_me</span>
+<span class="font-label-md text-label-md">Missions</span>
+</button>
+<button class="flex items-center gap-md p-md w-full text-left text-on-surface-variant hover:bg-surface-container transition-all transition-transform duration-200 active:translate-x-1">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-label-md">History</span>
+</button>
+</nav>
+<div class="mt-xl pt-lg border-t border-outline-variant space-y-md">
+<h3 class="px-md font-label-md text-label-md text-outline uppercase tracking-widest">Active Units</h3>
+<!-- Drone Status List -->
+<div class="space-y-sm px-xs">
+<!-- DR-01 -->
+<div class="p-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">
+<div class="flex justify-between items-center mb-xs">
+<span class="font-mono-data text-mono-data font-bold">DR-01</span>
+<span class="text-[10px] bg-green-100 text-green-700 px-base py-px rounded border border-green-200">ACTIVE</span>
+</div>
+<div class="space-y-xs">
+<div class="flex justify-between text-[11px] text-on-surface-variant">
+<span>Battery</span>
+<span>82%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[82%]"></div>
+</div>
+<div class="flex justify-between text-[11px] text-on-surface-variant mt-sm">
+<span>Altitude</span>
+<span class="font-mono-data">124m</span>
+</div>
+</div>
+</div>
+<!-- DR-02 -->
+<div class="p-md bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm">
+<div class="flex justify-between items-center mb-xs">
+<span class="font-mono-data text-mono-data font-bold">DR-02</span>
+<span class="text-[10px] bg-green-100 text-green-700 px-base py-px rounded border border-green-200">ACTIVE</span>
+</div>
+<div class="space-y-xs">
+<div class="flex justify-between text-[11px] text-on-surface-variant">
+<span>Battery</span>
+<span>45%</span>
+</div>
+<div class="w-full bg-surface-container h-1.5 rounded-full overflow-hidden">
+<div class="bg-tertiary h-full w-[45%]"></div>
+</div>
+<div class="flex justify-between text-[11px] text-on-surface-variant mt-sm">
+<span>Altitude</span>
+<span class="font-mono-data">88m</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="mt-auto space-y-xs">
+<button class="flex items-center gap-md p-md w-full text-left text-on-surface-variant hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined">help</span>
+<span class="font-label-md text-label-md">Support</span>
+</button>
+<button class="flex items-center gap-md p-md w-full text-left text-on-surface-variant hover:bg-surface-container transition-all">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">Settings</span>
+</button>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col relative bg-surface-container-low">
+<div class="flex-1 relative">
+<!-- Map Placeholder -->
+<div class="absolute inset-0 bg-[#f0f4f8] overflow-hidden">
+<!-- Map Background Style -->
+<div class="absolute inset-0 opacity-40" style="background-image: radial-gradient(#cbd5e1 1px, transparent 1px); background-size: 40px 40px;"></div>
+<!-- Drone Markers -->
+<div class="absolute top-[30%] left-[40%] group cursor-pointer">
+<div class="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center animate-pulse">
+<div class="w-3 h-3 bg-primary rounded-full shadow-[0_0_8px_#0058be]"></div>
+</div>
+<div class="absolute top-10 left-1/2 -translate-x-1/2 bg-surface px-sm py-xs rounded-md shadow-sm border border-outline-variant whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-[10px] font-bold">DR-01: 124m</span>
+</div>
+</div>
+<div class="absolute top-[60%] left-[25%] group cursor-pointer">
+<div class="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center animate-pulse">
+<div class="w-3 h-3 bg-primary rounded-full shadow-[0_0_8px_#0058be]"></div>
+</div>
+<div class="absolute top-10 left-1/2 -translate-x-1/2 bg-surface px-sm py-xs rounded-md shadow-sm border border-outline-variant whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-[10px] font-bold">DR-02: 88m</span>
+</div>
+</div>
+<div class="absolute top-[45%] left-[70%] group cursor-pointer">
+<div class="w-8 h-8 bg-primary/20 rounded-full flex items-center justify-center animate-pulse">
+<div class="w-3 h-3 bg-primary rounded-full shadow-[0_0_8px_#0058be]"></div>
+</div>
+<div class="absolute top-10 left-1/2 -translate-x-1/2 bg-surface px-sm py-xs rounded-md shadow-sm border border-outline-variant whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="text-[10px] font-bold">DR-03: 156m</span>
+</div>
+</div>
+<!-- Map Image Placeholder (Underneath the grid) -->
+<img class="w-full h-full object-cover mix-blend-multiply opacity-20" data-alt="A clean, minimalist high-angle satellite map view of a suburban area with organized streets and green spaces. The map uses a light, de-saturated color palette of soft grays, whites, and pale blues, creating a high-performance technical dashboard aesthetic. The lighting is even and soft, emphasizing clarity and precision over photographic realism. The overall mood is calm, professional, and sophisticated." data-location="Seoul, South Korea" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCXJCpNJQyZsJFnYxEo9-f6hYb6YPp0phJYj_tZRta74jn_lZUtluBGJcXe_VjxkLmb4qstE-lkPa-151OS2j2B32VdoME7gmIruVfsCP1Fb8cpkZQdvfUmW9kaCYia3olR7iwElzYaU-bhhy3P4v-GT3l7sXe7RkiphmzqXYeWoQJI4DHI20A95fB5FeRvaB-TqklUWUunQTdiijUUPCjd3Es5V79ojQ4B32YpyMEXPaIRRXH5nwVpGUUP9SsNJsFMRm6bbGXOWCw"/>
+</div>
+<!-- Overlay Alert Modal -->
+<div class="absolute inset-0 flex items-center justify-center z-[100] bg-on-surface/10 backdrop-blur-[2px]" id="tts-modal">
+<div class="w-[420px] bg-surface rounded-2xl shadow-2xl border border-outline-variant p-xl animate-in fade-in zoom-in duration-300">
+<div class="flex items-start gap-md mb-lg">
+<div class="w-12 h-12 bg-error-container rounded-full flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-error" data-icon="record_voice_over" style="font-variation-settings: 'FILL' 1;">record_voice_over</span>
+</div>
+<div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-xs">TTS 경고 송출 승인</h2>
+<p class="font-body-md text-on-surface-variant">Level 4 Priority Incident - Area 7-G. Approve warning broadcast via DR-01?</p>
+</div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-md mb-xl border border-outline-variant border-dashed">
+<p class="text-on-surface-variant italic text-sm">"경고: 해당 구역은 허가되지 않은 접근이 감지되었습니다. 즉시 퇴거해 주시기 바랍니다."</p>
+</div>
+<div class="flex gap-md justify-end">
+<button class="px-xl py-md rounded-lg font-label-md text-label-md text-on-surface-variant border border-outline-variant hover:bg-surface-container transition-colors active:scale-95" onclick="document.getElementById('tts-modal').style.display='none'">거절</button>
+<button class="px-xl py-md rounded-lg font-label-md text-label-md bg-primary text-on-primary hover:bg-primary-container shadow-sm transition-colors active:scale-95" onclick="document.getElementById('tts-modal').style.display='none'">경고 방송 송출</button>
+</div>
+</div>
+</div>
+<!-- Map UI Controls -->
+<div class="absolute bottom-lg left-lg flex flex-col gap-sm">
+<button class="bg-surface p-md rounded-full shadow-md border border-outline-variant hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined">add</span></button>
+<button class="bg-surface p-md rounded-full shadow-md border border-outline-variant hover:bg-surface-container-low transition-colors"><span class="material-symbols-outlined">remove</span></button>
+</div>
+</div>
+</main>
+<!-- Right Side Alerts Panel -->
+<aside class="w-[340px] bg-surface-bright border-l border-outline-variant flex flex-col overflow-hidden">
+<div class="p-lg border-b border-outline-variant bg-surface">
+<div class="flex justify-between items-center">
+<h3 class="font-title-lg text-title-lg text-on-surface">Real-time VLM Alerts</h3>
+<span class="flex h-2 w-2 rounded-full bg-error animate-pulse"></span>
+</div>
+<p class="font-label-md text-label-md text-on-surface-variant mt-xs">Visual Language Model Analytics</p>
+</div>
+<div class="flex-1 overflow-y-auto p-md space-y-md">
+<!-- Alert Card 1 -->
+<div class="p-md bg-surface border border-outline-variant rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
+<div class="flex justify-between items-start mb-sm">
+<div class="bg-error-container/50 text-error px-sm py-xs rounded text-[10px] font-bold uppercase">Critical</div>
+<span class="font-label-md text-label-md text-outline">12:45:02</span>
+</div>
+<div class="flex gap-md">
+<div class="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-outline-variant">
+<img class="w-full h-full object-cover grayscale brightness-110" data-alt="A CCTV or drone perspective thermal image capture showing a high-contrast human figure silhouette walking through a dark urban perimeter fence area at night. The lighting is stark and industrial, emphasizing surveillance and security. The colors are technical and cool-toned, primarily deep blues and whites, with a single bright highlight on the detected subject." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCI1S8CpNvIn5DEGMvFQHNWzOuOqZ7wA1IrkA5pJSSRryfp44fTWjxu_IJzGEMF7EUVFDdgmqciABIdganWqWDVe00gOHYIjfJ9FjtBGI6S98GEW65IYjhGDT5StoTkOHqm9MtD8UFDTt9rqCoqCGQglxLML6xF2tRZZkaM-pS7hZf-BK5RP99TwiGznPE4UU-7_hscv6ubRnjEfssw7bE6Ak8_YDBKvghZPBdNH3Kp_pEcWAV5OimeGStzXuwJRmgiJ3p_ZoY799g"/>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold text-on-surface mb-xs">Person detected</p>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Unidentified subject near Sector 7-G perimeter fence.</p>
+<div class="mt-sm flex items-center gap-xs text-primary">
+<span class="material-symbols-outlined text-sm">location_on</span>
+<span class="text-[10px] font-bold">DR-01 | Camera A</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Alert Card 2 -->
+<div class="p-md bg-surface border border-outline-variant rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer">
+<div class="flex justify-between items-start mb-sm">
+<div class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-sm py-xs rounded text-[10px] font-bold uppercase">Warning</div>
+<span class="font-label-md text-label-md text-outline">12:43:15</span>
+</div>
+<div class="flex gap-md">
+<div class="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-outline-variant">
+<img class="w-full h-full object-cover" data-alt="A clean, top-down drone photograph of a white cargo vehicle moving through a paved industrial facility during the daytime. The lighting is bright and clear, cast by a high afternoon sun, creating sharp, short shadows. The color palette is modern and neutral, emphasizing professional logistics and fleet monitoring. The style is sharp, architectural, and highly detailed." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDlc19gyFLlZy-8K_UHrrBuVlKSD4Af0ybKrsHBza_PfAa1qoR8gsbRSxyvAhHIgZ_P_v79_iw4PQG9pQpMkc1dZZkkGiu727b2VlS8ir9o4mnjAB36lq1ELjR0MhNgAge1pQez2Nsj8VlQeQ-faupzJE7F484a8hr9BHIBgKiK4tA8elnVV6N5DeL31KKWlgxsIGhROqaKACmxZ2KOgCHPv4Hi7vG8Zwm0T9U58ZD_FWAplBzkACuB1-K5uAOSMACRaWRf-5Kz2ao"/>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold text-on-surface mb-xs">Vehicle movement</p>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Cargo unit C-4 departing from loading bay 3.</p>
+<div class="mt-sm flex items-center gap-xs text-primary">
+<span class="material-symbols-outlined text-sm">location_on</span>
+<span class="text-[10px] font-bold">DR-02 | Camera B</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Alert Card 3 -->
+<div class="p-md bg-surface border border-outline-variant rounded-xl shadow-sm hover:shadow-md transition-shadow group cursor-pointer opacity-80">
+<div class="flex justify-between items-start mb-sm">
+<div class="bg-secondary-container text-on-secondary-container px-sm py-xs rounded text-[10px] font-bold uppercase">Info</div>
+<span class="font-label-md text-label-md text-outline">12:39:50</span>
+</div>
+<div class="flex gap-md">
+<div class="w-16 h-16 rounded-lg overflow-hidden shrink-0 border border-outline-variant">
+<img class="w-full h-full object-cover brightness-90" data-alt="An extreme close-up of a high-tech electronic component or sensor cluster on a drone's chassis. The lighting is studio-quality and directional, highlighting the metallic textures and precision engineering of the device. The color palette is monochromatic with small blue LED indicators. The mood is clinical, futuristic, and high-performance." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBQg3W0ZXy76QmH1xTuHH3a7x6J7ZYb6ucD9syIP0xyDvNB3KE3YsR2diKjhrSzIKftV6A-jqrhyuh2X12rSYog9D0V1hhHvJL4q_AAn29h4sK9CeTns9_4AcykfZnGk3nT_er42C6MTxax7uN9Jrp4LLfbOfKthsnqNgWz4nRzq7GF-wn4R5QB4WsYq5rXjMKhf-xSXhH6canVu9fj381JH8ZMJRHXck1v3aMgOJJGCa2S_9kQsokiBlqSpodU4KWt4Jn25zJy8X8"/>
+</div>
+<div>
+<p class="font-label-md text-label-md font-bold text-on-surface mb-xs">Thermal Anomaly</p>
+<p class="text-[11px] text-on-surface-variant leading-relaxed">Minor temperature variance detected in Transformer 02.</p>
+<div class="mt-sm flex items-center gap-xs text-primary">
+<span class="material-symbols-outlined text-sm">location_on</span>
+<span class="text-[10px] font-bold">DR-03 | Thermal IR</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="p-lg bg-surface-container-low border-t border-outline-variant">
+<button class="w-full py-md rounded-lg font-label-md text-label-md text-primary border border-primary hover:bg-primary-container/10 transition-colors">Clear All History</button>
+</div>
+</aside>
+</div>
+<!-- Mobile BottomNavBar (Hidden on desktop) -->
+<nav class="md:hidden flex justify-around items-center bg-surface h-16 border-t border-outline-variant px-md z-50">
+<button class="flex flex-col items-center gap-xs text-primary">
+<span class="material-symbols-outlined active-tab" data-icon="grid_view">grid_view</span>
+<span class="text-[10px] font-medium">Fleet</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="near_me">near_me</span>
+<span class="text-[10px] font-medium">Missions</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
+<span class="text-[10px] font-medium">Alerts</span>
+</button>
+<button class="flex flex-col items-center gap-xs text-on-surface-variant">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="text-[10px] font-medium">Settings</span>
+</button>
+</nav>
+<script>
+        // Simple micro-interaction for markers
+        document.querySelectorAll('.animate-pulse').forEach(marker => {
+            marker.addEventListener('click', () => {
+                marker.classList.add('scale-150');
+                setTimeout(() => marker.classList.remove('scale-150'), 300);
+            });
+        });
+
+        // ESC to close modal
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('tts-modal').style.display = 'none';
+            }
+        });
+    </script>
+</body></html>

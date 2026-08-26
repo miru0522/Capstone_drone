@@ -1,0 +1,56 @@
+# 서버팀이 /home/yunseon/Capstone/.gitignore에 이미 준비해둔 내용을 그대로 이식.
+# (2026-08-27, Capstone_drone 모노레포 통합 시)
+#
+# ⚠️ 서버 배포 제외 목록은 .rsyncignore 다. 둘은 목적이 다르므로 따로 관리한다.
+#    특히 시크릿은 "GitHub에는 안 되지만 서버에는 반드시 올라가야" 한다.
+#    여기에 넣은 것을 .rsyncignore에 그대로 복사하지 말 것.
+
+# ── 의존성·빌드 산출물 ──
+node_modules/
+dist/
+build/
+.gradle/
+__pycache__/
+
+# ── 에디터·도구 ──
+.vscode/
+.idea/
+.DS_Store
+.agents/
+.claude/
+
+# ── 런타임 데이터 (서버가 생성·보유) ──
+videodata/
+wavdata/
+profiledata/
+
+# ── 모델 가중치·학습 산출물 (용량) ──
+weights/
+wandb/
+**/*.pt
+**/*.pth
+*.safetensors
+*.bin
+
+# Qwen 공식 예제 노트북 (vendored, 40MB). 우리 코드가 참조하지 않는다.
+# 로컬 참고용으로만 두고 git·rsync 어디에도 올리지 않는다.
+DAE-vlm-main/cookbooks/
+
+# ── 백업본 ──
+*.bak*
+*~
+*.orig
+
+# ── 미디어 ──
+*.mp4
+
+# ── 시크릿 ── ⚠️ 서버에는 rsync로 반드시 올라가야 한다 (.rsyncignore에 넣지 말 것)
+.env
+.env.*
+application-secret.yml
+keystore.p12
+secret.yaml
+*.p12
+*.jks
+*.pem
+*.key
