@@ -451,6 +451,13 @@ class CameraAnomalyPipeline:
         frame_interval = 1.0 / FPS
         next_tick = time.time()
 
+        # ★2026-08-26 진단용: 캡처 루프가 목표 FPS를 못 따라가는지(=추론이
+        # 프레임 간격보다 오래 걸려 밀리는지) 확인. 1초 단위로 실제 처리
+        # 프레임 수와 밀린 시간 누적을 요약 로그.
+        diag_frame_count = 0
+        diag_lag_total = 0.0
+        diag_window_start = time.time()
+
         logger.info(f"캡처 루프 시작 (FPS={FPS}, 버퍼={BUFFER_MAXLEN}프레임/{BUFFER_MAXLEN/FPS:.0f}초)")
 
         try:
@@ -498,6 +505,22 @@ class CameraAnomalyPipeline:
                 # FPS 페이싱 (목표 9fps 유지)
                 next_tick += frame_interval
                 sleep_time = next_tick - time.time()
+
+                # ★2026-08-26 진단용 계측
+                diag_frame_count += 1
+                if sleep_time < 0:
+                    diag_lag_total += -sleep_time
+                now_diag = time.time()
+                if now_diag - diag_window_start >= 1.0:
+                    logger.info(
+                        f"[진단] 최근 {now_diag - diag_window_start:.1f}초간 "
+                        f"처리프레임={diag_frame_count}(목표 {FPS}), "
+                        f"밀린시간누적={diag_lag_total * 1000:.0f}ms"
+                    )
+                    diag_frame_count = 0
+                    diag_lag_total = 0.0
+                    diag_window_start = now_diag
+
                 if sleep_time > 0:
                     time.sleep(sleep_time)
                 else:

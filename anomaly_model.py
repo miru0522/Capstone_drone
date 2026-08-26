@@ -17,6 +17,7 @@ YOLOv5n(TensorRT) + WideBranchNet(Jigsaw-VAD, TensorRT) 파이프라인.
 """
 
 import os
+import time
 import logging
 from typing import Optional, Tuple
 
@@ -273,6 +274,14 @@ class AnomalyPipeline:
         self.wbn = WideBranchNetTRT(WBN_ENGINE_PATH, num_frames=WBN_NUM_FRAMES)
         logger.info("✅ AnomalyPipeline 초기화 완료")
 
+        # ★2026-08-26 진단용: 스트리밍 끊김/프레임드롭 원인 확인을 위한
+        # 단계별 소요시간 계측. 9회(약 1초, FPS=9 기준)마다 평균/최대를 요약 로그.
+        self._diag_count = 0
+        self._diag_sum_bbox = 0.0
+        self._diag_sum_prep = 0.0
+        self._diag_sum_wbn = 0.0
+        self._diag_max_total = 0.0
+
     def _detect_person_bbox(self, frame_bgr: np.ndarray) -> Optional[Tuple[int, int, int, int]]:
         """프레임에서 최대 confidence의 person bbox 반환. 없으면 None."""
         x, scale_info = _yolo_preprocess(frame_bgr)
@@ -289,6 +298,8 @@ class AnomalyPipeline:
         window: (T, H, W, C) BGR uint8, T frames (main.py에서 9프레임 전달 예정)
         Returns: anomaly_score 0.0~1.0 (높을수록 이상)
         """
+        t0 = time.time()
+
         T = window.shape[0]
         if T != WBN_NUM_FRAMES:
             # 프레임 수가 다르면 균등 샘플링으로 맞춤 (안전장치)
@@ -298,6 +309,7 @@ class AnomalyPipeline:
         # 첫 프레임 기준으로 사람 bbox 검출 (매 프레임 검출은 비용이 크므로
         # 첫 프레임 bbox를 시퀀스 전체에 재사용 - 1초 윈도우라 위치변화 적음)
         bbox = self._detect_person_bbox(window[0])
+        t1 = time.time()
         if bbox is None:
             # 사람이 없으면 이상 없음으로 처리
             return 0.0
@@ -322,6 +334,30 @@ class AnomalyPipeline:
         clip = np.stack(crops, axis=0)  # (T,64,64,3)
         clip = clip.transpose(3, 0, 1, 2)  # (3,T,64,64)
         clip = np.clip(clip, 0.0, 1.0)
+        t2 = time.time()
 
         score = self.wbn.infer_spatial_score(clip)
+        t3 = time.time()
+
+        # ★2026-08-26 진단: 단계별 소요시간 누적, 9회(≈1초)마다 요약 로그
+        self._diag_count += 1
+        self._diag_sum_bbox += (t1 - t0)
+        self._diag_sum_prep += (t2 - t1)
+        self._diag_sum_wbn += (t3 - t2)
+        self._diag_max_total = max(self._diag_max_total, t3 - t0)
+        if self._diag_count >= 9:
+            n = self._diag_count
+            logger.info(
+                f"[진단] 추론 소요시간(최근 {n}회 평균, 목표프레임간격=111ms) - "
+                f"YOLO검출={self._diag_sum_bbox / n * 1000:.1f}ms, "
+                f"크롭전처리={self._diag_sum_prep / n * 1000:.1f}ms, "
+                f"WBN추론={self._diag_sum_wbn / n * 1000:.1f}ms, "
+                f"최대total={self._diag_max_total * 1000:.1f}ms"
+            )
+            self._diag_count = 0
+            self._diag_sum_bbox = 0.0
+            self._diag_sum_prep = 0.0
+            self._diag_sum_wbn = 0.0
+            self._diag_max_total = 0.0
+
         return score

@@ -14,6 +14,11 @@
 set -e
 cd "$(dirname "$0")"
 
+# ★2026-08-26: DEVICE_KEY 기본값 지정 (STOMP CONNECT X-Device-Key /
+# 스트리밍 업로드 인증에 사용됨). 이미 환경변수로 넘어온 값이 있으면
+# 그걸 우선한다 - 여기서는 비어있을 때만 기본값을 채운다.
+export DEVICE_KEY="${DEVICE_KEY:-HPC-2026}"
+
 MAVSDK_SERVER_BIN="/usr/local/lib/python3.8/dist-packages/mavsdk/bin/mavsdk_server"
 SERIAL_PORT="/dev/pixhawk"
 GRPC_PORT="50051"
