@@ -345,7 +345,7 @@ class AnomalyPipeline:
         self._diag_sum_prep += (t2 - t1)
         self._diag_sum_wbn += (t3 - t2)
         self._diag_max_total = max(self._diag_max_total, t3 - t0)
-        if self._diag_count >= 9:
+        if self._diag_count >= 1:  # ★2026-08-26: 추론이 2초에 1회로 줄어 매회 로그
             n = self._diag_count
             logger.info(
                 f"[진단] 추론 소요시간(최근 {n}회 평균, 목표프레임간격=111ms) - "

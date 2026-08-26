@@ -44,6 +44,11 @@ CAMERA_HEIGHT = 720
 ANOMALY_THRESHOLD = 0.8     # 트리거 임계값 (모델 도입 후 튜닝 필요)
 TRIGGER_COOLDOWN_SEC = 9    # 같은 클립을 중복 전송하지 않도록 쿨다운
 
+# ★2026-08-26: 매 프레임 추론 대신 2초에 한 번만 추론하도록 스로틀링.
+# 자체추론+스트리밍 동시 진행 시 캡처 프레임 드롭/스트리밍 끊김이 보고돼,
+# 캡처 루프가 무거운 YOLO+WBN 추론에 밀리는 걸 완화하기 위함.
+INFERENCE_INTERVAL_FRAMES = FPS * 2  # 18프레임 (FPS=9 기준)
+
 # ─── 실시간 스트리밍 설정 (테스트/Tailscale 직결 전용) ─────────────
 STREAM_ENABLED = os.environ.get("STREAM_ENABLED", "1") == "1"
 STREAM_PORT = int(os.environ.get("STREAM_PORT", "8090"))
@@ -458,7 +463,12 @@ class CameraAnomalyPipeline:
         diag_lag_total = 0.0
         diag_window_start = time.time()
 
-        logger.info(f"캡처 루프 시작 (FPS={FPS}, 버퍼={BUFFER_MAXLEN}프레임/{BUFFER_MAXLEN/FPS:.0f}초)")
+        inference_counter = 0  # INFERENCE_INTERVAL_FRAMES마다만 추론 실행
+
+        logger.info(
+            f"캡처 루프 시작 (FPS={FPS}, 버퍼={BUFFER_MAXLEN}프레임/{BUFFER_MAXLEN/FPS:.0f}초, "
+            f"추론주기={INFERENCE_INTERVAL_FRAMES}프레임/{INFERENCE_INTERVAL_FRAMES/FPS:.0f}초)"
+        )
 
         try:
             while self._running:
@@ -471,8 +481,11 @@ class CameraAnomalyPipeline:
                 self.buffer.push(frame)
                 self.latest_frame_for_stream = frame  # 스트리밍용 최신 프레임 갱신
 
-                # 연속 추론: 버퍼가 충분히 찼으면 매 프레임 슬라이딩 윈도우로 추론
-                if self.buffer.is_ready_for_inference():
+                # ★2026-08-26: 매 프레임 대신 INFERENCE_INTERVAL_FRAMES(2초)마다
+                # 한 번만 슬라이딩 윈도우 추론 (캡처/스트리밍 부하 완화)
+                inference_counter += 1
+                if self.buffer.is_ready_for_inference() and inference_counter >= INFERENCE_INTERVAL_FRAMES:
+                    inference_counter = 0
                     window = self.buffer.get_latest_window(INFER_WINDOW_LEN)
                     score = detect_anomaly(window)
 
