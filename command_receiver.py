@@ -581,15 +581,33 @@ class DroneCommandHandler:
             self._status = "LANDING"
             self._write_status_state()
             await asyncio.wait_for(self.system.action.land(), timeout=ACTION_TIMEOUT_SEC)
-            # 하강 완료 감지는 in_air 폴링으로 처리 (간단화: 일정시간 후 IDLE 전환)
+            # 하강 완료 감지는 in_air 폴링으로 처리.
+            # ★2026-08-26: 이 감시 태스크를 self._watch_task에 저장해
+            # _cancel_watch_task()로 취소 가능하게 함. 기존엔 참조가
+            # 어디에도 남지 않아, LAND 도중 다른 명령(예: CANCEL_PATROL)이
+            # 들어와 상태가 바뀌어도 이 태스크가 계속 살아있다가, 나중에
+            # 실제 in_air=False 시점에 self._status를 묻지도 않고 "IDLE"로
+            # 강제 덮어써서 텔레메트리 상태가 꼬일 수 있었음(다른 완주/도착
+            # 감지 태스크와 달리 이것만 추적이 안 되고 있었음). 상태가
+            # 여전히 LANDING일 때만 IDLE로 바꾸는 가드도 이중으로 추가.
             async def _wait_landed():
-                async for in_air in self.system.telemetry.in_air():
-                    if not in_air:
-                        self._status = "IDLE"
-                        self._write_status_state()
-                        logger.info("✅ 착륙 완료 (IDLE)")
-                        break
-            asyncio.create_task(_wait_landed())
+                try:
+                    async for in_air in self.system.telemetry.in_air():
+                        if not in_air:
+                            if self._status == "LANDING":
+                                self._status = "IDLE"
+                                self._write_status_state()
+                                logger.info("✅ 착륙 완료 (IDLE)")
+                            else:
+                                logger.info(
+                                    f"착륙 완료 감지됐으나 상태가 이미 {self._status}로 "
+                                    f"바뀌어 있어 IDLE 덮어쓰기 생략"
+                                )
+                            break
+                except asyncio.CancelledError:
+                    logger.debug("착륙 완료 감지 태스크 취소됨 (다른 명령으로 상태 전환)")
+                    raise
+            self._watch_task = asyncio.create_task(_wait_landed())
         except asyncio.TimeoutError:
             logger.error(f"⏱️ LAND 타임아웃")
         except Exception as e:
