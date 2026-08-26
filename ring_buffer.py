@@ -5,7 +5,9 @@ CSI 카메라에서 들어오는 프레임을 메모리 내 deque로 순환 저�
 설계 파라미터:
     - FPS: 9
     - 버퍼 길이: 9초 (81 프레임)
-    - 추론 창: 5초 (45 프레임, 슬라이딩 윈도우)
+    - 추론 창: 1초 (9 프레임, 슬라이딩 윈도우) — WideBranchNet 입력 요구사항
+      (★2026-08-26: docstring이 실제 INFER_WINDOW_SECONDS=1과 어긋나 있던
+      것을 수정. main.py detect_anomaly()의 T=9(1초) 설명과 일치시킴)
 """
 
 import time

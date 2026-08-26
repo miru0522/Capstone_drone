@@ -92,7 +92,7 @@ BROADCAST_COMPLETE_URL_TMPL = SERVER_URL + "/events/{event_id}/broadcast-complet
 DEFAULT_ALTITUDE = float(os.environ.get("PATROL_ALTITUDE", "30.0"))
 DEFAULT_SPEED = float(os.environ.get("PATROL_SPEED", "5.0"))
 ACTION_TIMEOUT_SEC = 15.0
-CANCEL_TIMEOUT_SEC = 5.0   # EMERGENCY_STOP(진짜 kill)용 - 최대한 빨리 반응
+EMERGENCY_STOP_TIMEOUT_SEC = 5.0   # EMERGENCY_STOP(진짜 kill)용 - 최대한 빨리 반응
 
 # ★2026-08-21: 배터리 자율복귀 페일세이프 (서버 경고 60%, 드론 자율복귀 40%)
 BATTERY_RTL_THRESHOLD_PERCENT = float(os.environ.get("BATTERY_RTL_THRESHOLD", "40.0"))
@@ -622,10 +622,10 @@ class DroneCommandHandler:
         try:
             logger.warning("🚨 EMERGENCY_STOP 실행 (즉시 kill - 관제사 승인된 강제정지)")
             try:
-                await asyncio.wait_for(self.system.action.kill(), timeout=CANCEL_TIMEOUT_SEC)
+                await asyncio.wait_for(self.system.action.kill(), timeout=EMERGENCY_STOP_TIMEOUT_SEC)
                 logger.info("✅ kill(강제disarm) 완료")
             except asyncio.TimeoutError:
-                logger.error(f"⏱️ kill 타임아웃 ({CANCEL_TIMEOUT_SEC}s) - 응답 없음")
+                logger.error(f"⏱️ kill 타임아웃 ({EMERGENCY_STOP_TIMEOUT_SEC}s) - 응답 없음")
             self._cancel_watch_task()
             self._route = []
             self._status = "IDLE"
