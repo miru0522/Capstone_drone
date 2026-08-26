@@ -197,6 +197,10 @@ class WideBranchNetTRT:
         self.out_shapes = []
         for oi in self.output_idxs:
             shape = tuple(self.context.get_binding_shape(oi))
+            # ★2026-08-26: TRTDetector와 동일하게 동적 shape(-1) 방어 클램프.
+            # 지금 쓰는 로컬 고정엔진은 해당 없어 보이지만, 엔진을 재생성할 때
+            # 대비해 두 클래스의 shape 처리를 일관되게 맞춰둠.
+            shape = tuple(max(d, 1) for d in shape)
             dtype = trt.nptype(self.engine.get_binding_dtype(oi))
             nbytes = int(np.prod(shape)) * np.dtype(dtype).itemsize
             self.d_outs.append(cuda.mem_alloc(nbytes))

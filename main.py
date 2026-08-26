@@ -87,17 +87,38 @@ def get_anomaly_pipeline() -> AnomalyPipeline:
     return _anomaly_pipeline
 
 
+INFERENCE_FAILURE_ALERT_THRESHOLD = 10  # 이만큼 연속 실패하면 경고 강화
+
+_consecutive_inference_failures = 0
+
+
 def detect_anomaly(window: np.ndarray) -> float:
     """
     YOLOv5n + WideBranchNet(Jigsaw-VAD) 실제 추론.
     window: (T,H,W,C) BGR uint8, T=9 (1초, ring_buffer INFER_WINDOW_SECONDS=1)
     반환: anomaly_score 0.0~1.0 (높을수록 이상)
     """
+    global _consecutive_inference_failures
     try:
         pipeline = get_anomaly_pipeline()
-        return pipeline.compute_score(window)
+        score = pipeline.compute_score(window)
+        if _consecutive_inference_failures > 0:
+            logger.info(f"✅ 모델 추론 복구됨 ({_consecutive_inference_failures}회 연속 실패 후)")
+        _consecutive_inference_failures = 0
+        return score
     except Exception as e:
-        logger.error(f"모델 추론 실패: {e}")
+        # ★2026-08-26: 추론 실패는 여전히 0.0(정상)으로 처리해 오탐/불필요한
+        # 호버링을 막지만(기존 fail-safe 유지), 엔진이 완전히 죽은 채로
+        # 계속 조용히 0.0만 반환하면 운영자가 전혀 알 수 없었음. 연속 실패
+        # 횟수를 세어 임계치 이상이면 눈에 띄게(critical) 경고한다.
+        _consecutive_inference_failures += 1
+        if _consecutive_inference_failures >= INFERENCE_FAILURE_ALERT_THRESHOLD:
+            logger.critical(
+                f"🚨 모델 추론 {_consecutive_inference_failures}회 연속 실패 - "
+                f"엔진/GPU 상태 확인 필요 (이상감지가 사실상 멈춰있을 수 있음): {e}"
+            )
+        else:
+            logger.error(f"모델 추론 실패 ({_consecutive_inference_failures}회 연속): {e}")
         return 0.0  # 추론 실패 시 안전하게 정상으로 처리 (오탐 방지)
 
 
