@@ -1,0 +1,269 @@
+"""
+test_telemetry_sender.py  (★★★ 2026-08-18 스펙 전면 재작성 ★★★)
+
+배터리(또는 GPS) 미인식 상태에서도 서버-드론 통신 흐름을 테스트하기
+위한 텔레메트리 강제전송 스크립트. telemetry_sender.py(신버전, STOMP
+SEND /app/telemetry)를 기반으로, 배터리<=0 가드를 의도적으로 생략하고
+가짜 값을 채워서 강제 전송한다.
+
+모드:
+  1: 가짜 GPS만 (배터리는 실제값 그대로, 실제값이 0이면 그대로 0 전송)
+  2: 가짜 배터리만 (GPS는 실제값 그대로)
+  3: 가짜 GPS + 가짜 배터리 둘 다
+
+사용법:
+  python3 test_telemetry_sender.py <모드>          (인자로 즉시 지정)
+  python3 test_telemetry_sender.py                 (대화형 프롬프트)
+
+주의: 이건 테스트 전용. 실제 운용시에는 절대 사용하지 말 것.
+"""
+
+import os
+import sys
+import json
+import time
+import asyncio
+import logging
+import threading
+from urllib.parse import urlparse
+from typing import Optional
+
+import stomp
+import websocket
+from mavsdk import System
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger("test_telemetry_sender")
+
+DRONE_ID = os.environ.get("DRONE_SYSID", "DR-01")
+DEVICE_KEY = os.environ.get("DEVICE_KEY", "")
+
+SERVER_URL = os.environ.get("SERVER_URL", "http://203.249.90.3:8031")
+WS_ENDPOINT = "/ws"
+TELEMETRY_DESTINATION = "/app/telemetry"
+
+SEND_INTERVAL_SEC = 1.0
+RECONNECT_SLEEP_SEC = 5.0
+
+STATUS_STATE_PATH = os.environ.get("STATUS_STATE_PATH", "/tmp/drone_status_state.json")
+
+# ─── 가짜값 설정 ────────────────────────────────────────────────
+FAKE_LAT = 36.6215
+FAKE_LON = 127.2870
+FAKE_ALT = 100.0
+FAKE_BATT_PERCENT = 77.0
+FAKE_BATT_VOLT = 23.5
+
+parsed = urlparse(SERVER_URL)
+host = parsed.hostname
+port = parsed.port or 80
+ws_scheme = "wss" if parsed.scheme == "https" else "ws"
+FORCE_WS_URI = f"{ws_scheme}://{host}:{port}{WS_ENDPOINT}"
+
+_original_create_connection = websocket.create_connection
+
+def _patched_create_connection(url, *args, **kwargs):
+    logger.info(f"[STOMP-Patch] Overriding URL: {url} -> {FORCE_WS_URI}")
+    if kwargs.get('sslopt') is None:
+        kwargs['sslopt'] = {}
+    import ssl as _ssl
+    kwargs['sslopt']['cert_reqs'] = _ssl.CERT_NONE
+    return _original_create_connection(FORCE_WS_URI, *args, **kwargs)
+
+websocket.create_connection = _patched_create_connection
+
+
+def read_status_state() -> dict:
+    try:
+        with open(STATUS_STATE_PATH, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {"status": "IDLE", "currentAction": None}
+
+
+def ask_test_mode() -> int:
+    print("=" * 50)
+    print(" 텔레메트리 테스트 모드 선택 (STOMP 버전)")
+    print(" 1: 가짜 GPS만 (배터리는 실제값)")
+    print(" 2: 가짜 배터리만 (GPS는 실제값)")
+    print(" 3: 가짜 GPS + 가짜 배터리 둘 다")
+    print("=" * 50)
+    while True:
+        try:
+            choice = int(input("모드 번호 입력 (1/2/3): ").strip())
+            if choice in (1, 2, 3):
+                return choice
+        except ValueError:
+            pass
+        print("1, 2, 3 중 하나를 입력하세요.")
+
+
+class TestTelemetrySender:
+    def __init__(self, mode: int):
+        self.mode = mode
+        self.system: Optional[System] = None
+        self.stomp_conn: Optional[stomp.WSStompConnection] = None
+        self.running = False
+        self.state = {
+            "is_connected": False,
+            "lat": 0.0, "lon": 0.0, "alt": 0.0,
+            "batt_percent": 0.0, "batt_volt": 0.0,
+        }
+        self._tasks = []
+
+    async def connect_drone(self) -> bool:
+        try:
+            self.system = System(mavsdk_server_address="localhost", port=50051)
+            logger.info("공유 mavsdk_server(localhost:50051)에 연결 시도")
+            await asyncio.wait_for(self.system.connect(), timeout=10.0)
+            return True
+        except Exception as e:
+            logger.error(f"❌ 드론 연결 실패: {e}")
+            return False
+
+    async def connect_drone_with_retry(self):
+        while not await self.connect_drone():
+            logger.info(f"⏳ {RECONNECT_SLEEP_SEC}초 후 재시도...")
+            await asyncio.sleep(RECONNECT_SLEEP_SEC)
+        logger.info("✅ 드론 연결 성공")
+
+    async def watch_connection(self):
+        try:
+            async for state in self.system.core.connection_state():
+                self.state["is_connected"] = state.is_connected
+        except Exception as e:
+            logger.debug(f"연결 모니터링 오류: {e}")
+
+    async def watch_battery(self):
+        try:
+            async for battery in self.system.telemetry.battery():
+                pct = battery.remaining_percent
+                if pct <= 1.0:
+                    pct *= 100.0
+                self.state["batt_percent"] = round(pct, 1)
+                self.state["batt_volt"] = round(battery.voltage_v, 2)
+        except Exception as e:
+            logger.debug(f"배터리 스트림 오류: {e}")
+
+    async def watch_position(self):
+        try:
+            async for position in self.system.telemetry.position():
+                self.state["lat"] = round(position.latitude_deg, 6)
+                self.state["lon"] = round(position.longitude_deg, 6)
+                self.state["alt"] = round(position.absolute_altitude_m, 2)
+        except Exception as e:
+            logger.debug(f"GPS 스트림 오류: {e}")
+
+    def connect_stomp(self):
+        while True:
+            try:
+                logger.info(f"[STOMP] Connecting to {host}:{port} (forced URL: {FORCE_WS_URI}) ...")
+                conn = stomp.WSStompConnection([(host, port)])
+                connect_headers = {}
+                if DEVICE_KEY:
+                    connect_headers["X-Device-Key"] = DEVICE_KEY
+                conn.connect(wait=True, headers=connect_headers)
+                logger.info("[STOMP] Telemetry connection established!")
+                self.stomp_conn = conn
+                return
+            except Exception as e:
+                logger.error(f"[STOMP] 텔레메트리 연결 오류: {e}")
+                time.sleep(RECONNECT_SLEEP_SEC)
+
+    def _build_payload(self) -> dict:
+        lat, lon, alt = self.state["lat"], self.state["lon"], self.state["alt"]
+        batt_percent = self.state["batt_percent"]
+
+        if self.mode in (1, 3):
+            lat, lon, alt = FAKE_LAT, FAKE_LON, FAKE_ALT
+        if self.mode in (2, 3):
+            batt_percent = FAKE_BATT_PERCENT
+
+        status_info = read_status_state()
+        payload = {
+            "droneId": DRONE_ID,
+            "status": status_info.get("status", "IDLE"),
+            "currentAction": status_info.get("currentAction"),
+            "gps": {"lat_deg": lat, "lon_deg": lon, "abs_alt_m": alt},
+            "battery": {"remaining_percent": batt_percent},
+        }
+        return payload
+
+    def _send_telemetry(self, payload: dict) -> bool:
+        try:
+            if self.stomp_conn is None or not self.stomp_conn.is_connected():
+                self.connect_stomp()
+            self.stomp_conn.send(
+                destination=TELEMETRY_DESTINATION,
+                body=json.dumps(payload),
+                content_type="application/json",
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"⚠️ 텔레메트리 전송 실패: {e}")
+            return False
+
+    async def telemetry_loop(self):
+        while self.running:
+            await asyncio.sleep(SEND_INTERVAL_SEC)
+
+            if not self.state["is_connected"]:
+                logger.info("⏳ [하드웨어 연결 대기] Heartbeat 신호를 기다리는 중...")
+                continue
+
+            # ★테스트 모드: 실제 telemetry_sender.py의 batt_volt<=0 가드를
+            # 의도적으로 생략함 (그게 이 스크립트의 존재 이유)
+            payload = self._build_payload()
+
+            ok = await asyncio.get_event_loop().run_in_executor(None, self._send_telemetry, payload)
+            icon = "📡" if ok else "⚠️"
+            g = payload["gps"]; b = payload["battery"]
+            logger.info(
+                f"{icon} [TEST mode={self.mode}] droneId={payload['droneId']} "
+                f"status={payload['status']} currentAction={payload['currentAction']} "
+                f"lat={g['lat_deg']:.6f} lon={g['lon_deg']:.6f} alt={g['abs_alt_m']:.1f}m "
+                f"batt={b['remaining_percent']}%"
+            )
+
+    async def run(self):
+        self.running = True
+        await self.connect_drone_with_retry()
+
+        stomp_thread = threading.Thread(target=self.connect_stomp, daemon=True)
+        stomp_thread.start()
+        stomp_thread.join(timeout=15.0)
+
+        self._tasks = [
+            asyncio.create_task(self.watch_connection()),
+            asyncio.create_task(self.watch_battery()),
+            asyncio.create_task(self.watch_position()),
+            asyncio.create_task(self.telemetry_loop()),
+        ]
+        logger.info(f"[TEST mode={self.mode}] 텔레메트리 강제전송 시작 → STOMP {TELEMETRY_DESTINATION}")
+        await asyncio.gather(*self._tasks)
+
+    def stop(self):
+        self.running = False
+        for t in self._tasks:
+            t.cancel()
+
+
+async def main():
+    if len(sys.argv) > 1 and sys.argv[1] in ("1", "2", "3"):
+        mode = int(sys.argv[1])
+        logger.info(f"명령행 인자로 모드 {mode} 지정됨")
+    else:
+        mode = ask_test_mode()
+    sender = TestTelemetrySender(mode)
+    try:
+        await sender.run()
+    except KeyboardInterrupt:
+        logger.info("🛑 종료")
+        sender.stop()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 종료")

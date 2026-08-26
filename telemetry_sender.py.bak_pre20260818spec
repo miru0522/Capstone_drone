@@ -1,0 +1,185 @@
+"""
+telemetry_sender.py (통합본: 최신 백그라운드 구독 구조 + 초기본 재시도/timeout/env)
+
+드론 상태(GPS, 배터리)를 백엔드 서버로 주기적 HTTP POST 전송.
+
+서버 명세 (drone_integration_spec.md 2번):
+ URL : https://203.249.90.3:8080/telemetry
+ 방식 : HTTPS POST, application/json
+ 주기 : 1초
+ SSL : 자체서명 인증서 → verify=False 필수
+ JSON 구조:
+ {
+   "sysid": "DR-01",
+   "gps": {"lat_deg": float, "lon_deg": float},
+   "battery": {"remaining_percent": float}
+ }
+
+포트: /dev/pixhawk (udev 규칙으로 시리얼번호 기반 고정)
+"""
+
+import os
+import asyncio
+import logging
+
+import requests
+import urllib3
+from mavsdk import System
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger("telemetry_sender")
+
+TELEMETRY_URL = os.environ.get("TELEMETRY_URL", "http://203.249.90.3:8031/telemetry")
+SYSID = os.environ.get("DRONE_SYSID", "DR-01")
+MAVSDK_URI = os.environ.get("MAVSDK_URI", "serial:///dev/pixhawk:115200")
+SEND_INTERVAL_SEC = 1.0
+POST_TIMEOUT_SEC = 5.0
+RECONNECT_SLEEP_SEC = 5.0
+
+
+class TelemetrySender:
+    def __init__(self):
+        self.system = None
+        self.running = False
+        self.state = {
+            "is_connected": False,
+            "lat": 0.0,
+            "lon": 0.0,
+            "alt": 0.0,
+            "batt_percent": 0.0,
+            "batt_volt": 0.0,
+        }
+        self._tasks = []
+
+    async def connect_drone(self) -> bool:
+        try:
+            # 공유 mavsdk_server(포트 50051)에 접속 - 시리얼 포트 독점 문제 해결
+            self.system = System(mavsdk_server_address="localhost", port=50051)
+            logger.info("공유 mavsdk_server(localhost:50051)에 연결 시도")
+            await asyncio.wait_for(
+                self.system.connect(), timeout=10.0
+            )
+            return True
+        except Exception as e:
+            logger.error(f"❌ 드론 연결 실패: {e}")
+            return False
+
+    async def connect_with_retry(self):
+        while not await self.connect_drone():
+            logger.info(f"⏳ {RECONNECT_SLEEP_SEC}초 후 재시도...")
+            await asyncio.sleep(RECONNECT_SLEEP_SEC)
+        logger.info("✅ 드론 연결 성공")
+
+    async def watch_connection(self):
+        try:
+            async for state in self.system.core.connection_state():
+                self.state["is_connected"] = state.is_connected
+                if state.is_connected:
+                    logger.info("✅ 픽스호크 연결 확인 (Heartbeat 수신 중)")
+                else:
+                    logger.warning("❌ 픽스호크 연결 끊김 (Heartbeat 미수신)")
+        except Exception as e:
+            logger.error(f"연결 모니터링 오류: {e}")
+
+    async def watch_battery(self):
+        try:
+            async for battery in self.system.telemetry.battery():
+                pct = battery.remaining_percent
+                if pct <= 1.0:
+                    pct *= 100.0
+                self.state["batt_percent"] = round(pct, 1)
+                self.state["batt_volt"] = round(battery.voltage_v, 2)
+        except Exception as e:
+            logger.debug(f"배터리 스트림 오류: {e}")
+
+    async def watch_position(self):
+        try:
+            async for position in self.system.telemetry.position():
+                self.state["lat"] = round(position.latitude_deg, 6)
+                self.state["lon"] = round(position.longitude_deg, 6)
+                self.state["alt"] = round(position.absolute_altitude_m, 2)
+        except Exception as e:
+            logger.debug(f"GPS 스트림 오류: {e}")
+
+    def _post_telemetry(self, payload) -> bool:
+        try:
+            resp = requests.post(
+                TELEMETRY_URL,
+                json=payload,
+                verify=False,
+                timeout=POST_TIMEOUT_SEC,
+            )
+            if resp.status_code == 200:
+                return True
+            logger.warning(f"텔레메트리 실패 (status={resp.status_code})")
+            return False
+        except requests.RequestException as e:
+            logger.warning(f"⚠️ 서버 전송 실패: {e}")
+            return False
+
+    async def telemetry_loop(self):
+        while self.running:
+            await asyncio.sleep(SEND_INTERVAL_SEC)
+
+            if not self.state["is_connected"]:
+                logger.info("⏳ [하드웨어 연결 대기] Heartbeat 신호를 기다리는 중... (포트/권한 확인)")
+                continue
+
+            if self.state["batt_volt"] <= 0.0:
+                logger.info("⏳ [파라미터 대기] 연결되었으나 데이터 없음 (SR0_EXT_STAT, SR0_POSITION 확인 필요)")
+                continue
+
+            payload = {
+                "sysid": SYSID,
+                "gps": {
+                    "lat_deg": self.state["lat"],
+                    "lon_deg": self.state["lon"],
+                    "abs_alt_m": self.state["alt"],
+                },
+                "battery": {"remaining_percent": self.state["batt_percent"]},
+            }
+
+            ok = await asyncio.get_event_loop().run_in_executor(None, self._post_telemetry, payload)
+            icon = "📡" if ok else "⚠️"
+            logger.info(
+                f"{icon} sysid={payload['sysid']} "
+                f"lat={self.state['lat']:.6f} lon={self.state['lon']:.6f} "
+                f"alt={self.state['alt']:.1f}m "
+                f"batt={self.state['batt_percent']}% ({self.state['batt_volt']}V)"
+            )
+
+    async def run(self):
+        self.running = True
+        await self.connect_with_retry()
+
+        self._tasks = [
+            asyncio.create_task(self.watch_connection()),
+            asyncio.create_task(self.watch_battery()),
+            asyncio.create_task(self.watch_position()),
+            asyncio.create_task(self.telemetry_loop()),
+        ]
+        logger.info(f"텔레메트리 전송 시작 (주기 {SEND_INTERVAL_SEC}s → {TELEMETRY_URL})")
+        await asyncio.gather(*self._tasks)
+
+    def stop(self):
+        self.running = False
+        for t in self._tasks:
+            t.cancel()
+
+
+async def main():
+    sender = TelemetrySender()
+    try:
+        await sender.run()
+    except KeyboardInterrupt:
+        logger.info("🛑 종료")
+        sender.stop()
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 종료")

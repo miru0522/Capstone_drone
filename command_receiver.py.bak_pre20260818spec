@@ -1,0 +1,363 @@
+"""
+command_receiver.py  (★★★ 8개 액션 체계 최종본 — 2026-07-18 ★★★)
+
+서버 확정 명세 (2026-07-18, "8개 명시적 액션" 세분화):
+  STOMP over WebSocket, wss://203.249.90.3:8080/ws -> SockJS raw는 /ws/websocket
+  구독: /topic/commands (공용 채널)
+  모든 명령 "action" 키 사용. droneId는 문자열 sysid (예: "DR-01").
+
+  [비행 제어]
+  1. START_PATROL    : 지상 대기 중 -> arm + 이륙 + 경로비행 시작
+  2. RESUME_PATROL   : 공중 호버링 중 -> 중단된 지점부터 비행 재개
+  3. CANCEL_PATROL   : 지상(이륙전) 대기 중 -> 임무취소 + disarm
+                       (공중 수신 시 안전을 위해 무시)
+  4. PAUSE_PATROL    : 비행 중 -> 현재위치 호버링 (구 STOP_PATROL 이름변경)
+  5. RETURN_TO_BASE  : 공중 -> 저장된 스테이션(홈) 좌표로 귀환(RTL)+자동착륙
+
+  [데이터 설정]
+  6. ROUTE_UPDATE    : route:[[lat,lon],...] 웨이포인트 목록 갱신
+  7. STATION_UPDATE  : station:{lat,lng} 귀환목표 좌표 저장
+                       (RETURN_TO_BASE가 실제 사용)
+  8. PLAY_AUDIO      : audioBase64 (wav) STOMP로 수신 후 aplay 재생
+
+SSL 해결: websocket.create_connection 몽키패치로 cert_reqs=CERT_NONE 강제
+  (서버 자체서명 인증서 대응, 실기검증 완료).
+동시성 해결: STOMP 콜백(동기,별도스레드) -> asyncio.run_coroutine_threadsafe
+             로 메인 asyncio 루프에 MAVSDK 코루틴 제출.
+
+★ 실기 검증 이력 (2026-07-18, 실제 서버 명령으로 확인):
+  - droneId 필터링 (타 드론 무시 / 본인 수신) 정상 확인
+  - ROUTE_UPDATE 실제 6개 waypoint 파싱+미션업로드 확인
+  - START_PATROL 저장된 route 재사용 확인
+  - STATION_UPDATE 좌표 저장 확인
+  - waypoint_mission.py의 "Missing Takeoff Cmd" 버그 발견+수정
+    (STATUSTEXT로 원인 확인, takeoff() 명시적 호출 추가)
+
+★ 2026-07-18 수정: 다중 프로세스 MAVSDK 시리얼포트 충돌 해결 —
+  공유 mavsdk_server(gRPC localhost:50051) 방식으로 연결.
+  사전 실행 필요 (독립 프로세스, 계속 켜둘 것):
+    /usr/local/lib/python3.8/dist-packages/mavsdk/bin/mavsdk_server \
+      -p 50051 serial:///dev/pixhawk:115200
+
+★ PX4 착륙 하강속도 참고: RETURN_TO_BASE의 자동착륙은 PX4 기본
+  MPC_LAND_SPEED(약 0.7m/s, 저고도 구간) 사용. 별도 설정 없음.
+"""
+
+import os
+import ssl
+import json
+import time
+import base64
+import tempfile
+import subprocess
+import asyncio
+import logging
+import threading
+from urllib.parse import urlparse
+from typing import Optional, List, Dict
+
+# 이 드론의 식별자 (서버가 명령 JSON에 실어보내는 droneId와 비교)
+MY_SYSID = os.environ.get("DRONE_SYSID", "DR-01")
+
+import stomp
+import websocket
+from mavsdk import System
+
+from waypoint_mission import WaypointMissionController
+
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger("command_receiver")
+
+SERVER_URL = os.environ.get("SERVER_URL", "http://203.249.90.3:8031")
+WS_ENDPOINT = "/ws/websocket"
+MAVSDK_URI = os.environ.get("MAVSDK_URI", "serial:///dev/pixhawk:115200")  # 참고용, 미사용
+DEFAULT_ALTITUDE = float(os.environ.get("PATROL_ALTITUDE", "30.0"))
+DEFAULT_SPEED = float(os.environ.get("PATROL_SPEED", "5.0"))
+ACTION_TIMEOUT_SEC = 15.0   # 일반 MAVSDK 액션(arm/takeoff/hold 등) 최대 대기
+CANCEL_TIMEOUT_SEC = 5.0    # CANCEL_PATROL은 안전명령이라 더 짧게
+
+parsed = urlparse(SERVER_URL)
+host = parsed.hostname
+port = parsed.port or 8080
+ws_scheme = "wss" if parsed.scheme == "https" else "ws"
+FORCE_WS_URI = f"{ws_scheme}://{host}:{port}{WS_ENDPOINT}"
+
+# --- 몽키패치: SSL 검증 무력화 + URL 강제 override (검증된 해결법) ---
+_original_create_connection = websocket.create_connection
+
+def _patched_create_connection(url, *args, **kwargs):
+    logger.info(f"[STOMP-Patch] Overriding URL: {url} -> {FORCE_WS_URI}")
+    if kwargs.get('sslopt') is None:
+        kwargs['sslopt'] = {}
+    kwargs['sslopt']['cert_reqs'] = ssl.CERT_NONE
+    return _original_create_connection(FORCE_WS_URI, *args, **kwargs)
+
+websocket.create_connection = _patched_create_connection
+
+
+def play_tts_audio_base64(b64_audio: str) -> None:
+    """STOMP PLAY_AUDIO의 audioBase64를 디코딩해 wav 저장 후 aplay 재생."""
+    path = None
+    try:
+        audio_bytes = base64.b64decode(b64_audio)
+        fd, path = tempfile.mkstemp(suffix=".wav", prefix="tts_")
+        os.close(fd)
+        with open(path, "wb") as f:
+            f.write(audio_bytes)
+        logger.info(f"🔊 TTS 재생 시작: {path} ({len(audio_bytes)} bytes)")
+        subprocess.run(["aplay", path], check=True)
+        logger.info("✅ TTS 재생 완료")
+    except Exception as e:
+        logger.error(f"TTS 재생 실패: {e}")
+    finally:
+        if path is not None:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+
+
+class DroneCommandHandler:
+    """MAVSDK 드론 제어. STOMP(동기,별도스레드)에서 dispatch() 호출 -> asyncio로 넘김."""
+
+    def __init__(self, loop: asyncio.AbstractEventLoop):
+        self.loop = loop
+        self.system: Optional[System] = None
+        self.mission: Optional[WaypointMissionController] = None
+        self._route: List[Dict[str, float]] = []
+        self._station: Optional[Dict[str, float]] = None  # 스테이션(기지) 좌표
+
+    async def connect(self):
+        self.system = System(mavsdk_server_address="localhost", port=50051)
+        logger.info("공유 mavsdk_server(localhost:50051)에 연결 시도")
+        await self.system.connect()
+        await asyncio.sleep(2.0)
+        self.mission = WaypointMissionController(self.system)
+        logger.info("✅ 드론 연결 성공")
+
+    def dispatch(self, cmd_data: dict):
+        """STOMP 스레드에서 호출됨 -> asyncio 루프에 코루틴 제출."""
+        target_id = cmd_data.get("droneId")
+        if target_id is not None and target_id != MY_SYSID:
+            logger.debug(f"다른 드론({target_id}) 대상 명령 무시 (나: {MY_SYSID})")
+            return
+
+        action = cmd_data.get("action")
+        route = cmd_data.get("route")
+        logger.info(f"📥 명령 수신: {action} (대상: {target_id or '전체'})")
+
+        if action == "START_PATROL":
+            asyncio.run_coroutine_threadsafe(self._start_patrol(), self.loop)
+        elif action == "RESUME_PATROL":
+            asyncio.run_coroutine_threadsafe(self._resume_patrol(), self.loop)
+        elif action == "CANCEL_PATROL":
+            asyncio.run_coroutine_threadsafe(self._cancel_patrol(), self.loop)
+        elif action == "PAUSE_PATROL":
+            asyncio.run_coroutine_threadsafe(self._pause_patrol(), self.loop)
+        elif action == "RETURN_TO_BASE":
+            asyncio.run_coroutine_threadsafe(self._return_to_base(), self.loop)
+        elif action == "ROUTE_UPDATE":
+            asyncio.run_coroutine_threadsafe(self._route_update(route or []), self.loop)
+        elif action == "STATION_UPDATE":
+            station = cmd_data.get("station", {})
+            self._station = {"lat": station.get("lat"), "lon": station.get("lng")}
+            logger.info(f"🏠 STATION_UPDATE: 스테이션 좌표 저장 lat={self._station['lat']}, lon={self._station['lon']}")
+        elif action == "PLAY_AUDIO":
+            audio_b64 = cmd_data.get("audioBase64")
+            if audio_b64:
+                threading.Thread(target=play_tts_audio_base64, args=(audio_b64,), daemon=True).start()
+            else:
+                logger.warning("PLAY_AUDIO 명령에 audioBase64 필드 없음")
+        else:
+            logger.warning(f"❓ 알 수 없는 action: {action}")
+
+    async def _start_patrol(self):
+        """지상 대기 중 -> arm + 이륙 + 경로비행 시작."""
+        try:
+            logger.info("🚀 START_PATROL 실행 (지상 -> 이륙 -> 비행)")
+            if self._route:
+                ok = await asyncio.wait_for(
+                    self.mission.upload_and_start(
+                        self._route, altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
+                    ), timeout=ACTION_TIMEOUT_SEC * 2  # 미션은 takeoff 포함이라 더 길게
+                )
+                logger.info(f"미션 비행 {'시작됨' if ok else '실패'}")
+            else:
+                async for is_armed in self.system.telemetry.armed():
+                    if not is_armed:
+                        logger.info("드론 무장 시도...")
+                        await asyncio.wait_for(self.system.action.arm(), timeout=ACTION_TIMEOUT_SEC)
+                    break
+                logger.info("이륙 시도...")
+                await asyncio.wait_for(self.system.action.takeoff(), timeout=ACTION_TIMEOUT_SEC)
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ START_PATROL 타임아웃 ({ACTION_TIMEOUT_SEC}s 초과) - PX4 응답 없음")
+        except Exception as e:
+            logger.error(f"❌ START_PATROL 실패: {e}")
+
+    async def _resume_patrol(self):
+        """
+        공중 호버링(PAUSE_PATROL=action.hold) 중 -> 저장된 경로로 비행 재개.
+        PX4 미션 자체를 pause한게 아니라 action.hold()로 강제호버링 시킨
+        것이므로, 재개도 PX4 mission.resume이 아니라 저장된 _route를
+        다시 업로드+시작하는 방식으로 처리 (START_PATROL과 동일 로직).
+        """
+        try:
+            async for in_air in self.system.telemetry.in_air():
+                if not in_air:
+                    logger.warning("RESUME_PATROL: 공중이 아님 - 무시")
+                    return
+                break
+
+            if not self._route:
+                logger.warning("RESUME_PATROL: 저장된 경로 없음 - 재개 불가")
+                return
+
+            logger.info("▶️ RESUME_PATROL 실행 (호버링 해제 + 저장경로 비행 재개)")
+            ok = await asyncio.wait_for(
+                self.mission.upload_and_start(
+                    self._route, altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
+                ), timeout=ACTION_TIMEOUT_SEC * 2
+            )
+            logger.info(f"재개 비행 {'시작됨' if ok else '실패'}")
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ RESUME_PATROL 타임아웃 ({ACTION_TIMEOUT_SEC*2}s 초과)")
+        except Exception as e:
+            logger.error(f"❌ RESUME_PATROL 실패: {e}")
+
+    async def _cancel_patrol(self):
+        """
+        서버 최종확정(2026-07-18): 공중에서도 무시하지 않음.
+        관제사가 확인 팝업을 통해 승인한 강제 비상정지(Kill Switch)이므로,
+        지상/공중 관계없이 임무취소 + 즉시 disarm 수행.
+        (공중 disarm은 추락으로 이어질 수 있으나, 이는 관제사가 책임지고
+        승인한 것으로 간주 -- 서버 명세에 명시된 설계)
+        """
+        try:
+            logger.warning("🚫 CANCEL_PATROL 실행 (관제사 승인 강제 비상정지 - 즉시 disarm)")
+            # disarm을 최우선으로 먼저 시도 (안전이 최우선, 미션 정리는 그 다음)
+            # 서버 명세: 공중에서도 즉시 disarm 필요.
+            # MAVSDK disarm()은 "착륙 상태"로 판단될 때만 성공하고
+            # 공중이면 COMMAND_DENIED_NOT_LANDED 로 거부됨 (실기 확인됨).
+            # kill()은 공중/지상 무관하게 즉시 모터 정지 (진짜 Kill Switch).
+            try:
+                await asyncio.wait_for(self.system.action.kill(), timeout=CANCEL_TIMEOUT_SEC)
+                logger.info("✅ kill(강제disarm) 완료")
+            except asyncio.TimeoutError:
+                logger.error(f"⏱️ kill 타임아웃 ({CANCEL_TIMEOUT_SEC}s) - 응답 없음, 계속 진행")
+            self._route = []
+            try:
+                await asyncio.wait_for(self.mission.clear_mission(), timeout=CANCEL_TIMEOUT_SEC)
+            except asyncio.TimeoutError:
+                logger.warning("미션 초기화 타임아웃 (disarm은 이미 시도됨)")
+        except Exception as e:
+            logger.error(f"❌ CANCEL_PATROL 실패: {e}")
+
+    async def _pause_patrol(self):
+        """비행 중 -> 현재 위치에서 호버링 (구 STOP_PATROL)."""
+        try:
+            logger.info("🛑 PAUSE_PATROL -> 호버링 (제자리 정지)")
+            await asyncio.wait_for(self.system.action.hold(), timeout=ACTION_TIMEOUT_SEC)
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ PAUSE_PATROL 타임아웃 ({ACTION_TIMEOUT_SEC}s 초과)")
+        except Exception as e:
+            logger.error(f"❌ PAUSE_PATROL 실패: {e}")
+
+    async def _return_to_base(self):
+        """공중 -> 저장된 스테이션(홈) 좌표로 귀환(RTL) 후 자동착륙."""
+        try:
+            if self._station and self._station.get("lat") is not None:
+                logger.info(f"🏠 RETURN_TO_BASE 실행: 스테이션 좌표로 귀환 lat={self._station['lat']}, lon={self._station['lon']}")
+                ok = await asyncio.wait_for(
+                    self.mission.upload_and_start(
+                        [{"lat": self._station["lat"], "lon": self._station["lon"], "alt": DEFAULT_ALTITUDE}],
+                        altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
+                    ), timeout=ACTION_TIMEOUT_SEC * 2
+                )
+                logger.info(f"귀환 비행 {'시작됨' if ok else '실패'} (도착 후 착륙은 PX4 기본 처리)")
+            else:
+                logger.warning("RETURN_TO_BASE: 저장된 스테이션 좌표 없음 - PX4 기본 RTL로 대체")
+                await asyncio.wait_for(self.system.action.return_to_launch(), timeout=ACTION_TIMEOUT_SEC)
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ RETURN_TO_BASE 타임아웃")
+        except Exception as e:
+            logger.error(f"❌ RETURN_TO_BASE 실패: {e}")
+
+    async def _route_update(self, route: list):
+        """새로운 순찰 웨이포인트 목록 할당."""
+        try:
+            self._route = [
+                {"lat": float(pt[0]), "lon": float(pt[1]), "alt": DEFAULT_ALTITUDE}
+                for pt in route
+            ]
+            logger.info(f"🗺️ ROUTE_UPDATE: {len(self._route)}개 지점 저장 + 즉시 비행 시도")
+            ok = await asyncio.wait_for(
+                self.mission.upload_and_start(
+                    self._route, altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
+                ), timeout=ACTION_TIMEOUT_SEC * 2
+            )
+            logger.info(f"미션 {'시작됨' if ok else '실패'}")
+        except asyncio.TimeoutError:
+            logger.error(f"⏱️ ROUTE_UPDATE 타임아웃")
+        except Exception as e:
+            logger.error(f"❌ ROUTE_UPDATE 실패: {e}")
+
+
+class CommandListener(stomp.ConnectionListener):
+    def __init__(self, handler: DroneCommandHandler):
+        self.handler = handler
+
+    def on_error(self, frame):
+        logger.error(f"[STOMP] Error: {frame.body}")
+
+    def on_message(self, frame):
+        logger.info(f"[STOMP] Message: {frame.body}")
+        try:
+            cmd_data = json.loads(frame.body)
+            self.handler.dispatch(cmd_data)
+        except json.JSONDecodeError:
+            logger.error("[STOMP] Invalid JSON")
+
+    def on_disconnected(self):
+        logger.warning("[STOMP] 연결 끊김")
+
+
+def run_stomp(handler: DroneCommandHandler):
+    """STOMP 연결 (동기, 별도 스레드에서 실행). 끊기면 재연결."""
+    while True:
+        try:
+            logger.info(f"[STOMP] Connecting to {host}:{port} ...")
+            conn = stomp.WSStompConnection([(host, port)])
+            conn.set_listener('', CommandListener(handler))
+            conn.connect(wait=True)
+            logger.info("[STOMP] Connected!")
+            conn.subscribe(destination="/topic/commands", id=1, ack='auto')
+            logger.info("[STOMP] Subscribed. Waiting for commands...")
+
+            while conn.is_connected():
+                time.sleep(1)
+        except Exception as e:
+            logger.error(f"[STOMP] 연결 오류: {e}")
+
+        logger.info("⏳ 5초 후 STOMP 재연결...")
+        time.sleep(5)
+
+
+async def main():
+    loop = asyncio.get_event_loop()
+    handler = DroneCommandHandler(loop)
+    await handler.connect()
+
+    t = threading.Thread(target=run_stomp, args=(handler,), daemon=True)
+    t.start()
+
+    logger.info("명령 수신기 가동 중 (Ctrl+C 종료)")
+    while True:
+        await asyncio.sleep(1)
+
+
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("🛑 종료")

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+logs/
+test_videos/
+*.engine
+\*\*결론
+ENDPY
+\[!NOTE\]
+\[!TIP\]
+EOF
