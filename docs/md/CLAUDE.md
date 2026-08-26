@@ -26,24 +26,35 @@
 
 ## 2. 코드/문서 백업 규칙
 
-**2026-08-26부터: 코드 백업은 Google Drive 대신 git으로 전환.** (문서 백업은 기존 Drive 방식 유지)
+**2026-08-27부터: 코드+문서 모두 Google Drive 대신 git(단일 저장소 `Capstone_drone`)으로 전환.**
+(Drive는 과거 이력 조회용으로만 남기고 더는 갱신하지 않음)
 
-### 2-1. 코드 백업 (git)
+### 2-1. 저장소 구조: `https://github.com/miru0522/Capstone_drone` (private)
 
-1. **drone_2026(Jetson) 코드**는 Jetson 로컬 저장소(`~/drone_2026/code/`, git 초기화 완료)에서 직접 커밋하고 GitHub 비공개 저장소로 push한다.
-   - 저장소: `https://github.com/miru0522/drone_2026` (private)
-   - Jetson → GitHub 인증: 이 저장소 전용 배포키(`~/.ssh/id_ed25519_github_drone2026`, write 권한, repo 단위로 범위 한정) 사용. 계정 전체 권한을 주는 개인 토큰(PAT)이 아님.
-   - 기본 브랜치: `main`
-   - `.gitignore`로 `__pycache__/`, `logs/`, `test_videos/`, `*.engine`(TensorRT 엔진 — 하드웨어/버전 종속 바이너리라 git 백업 대상 아님, 필요시 재빌드) 제외
-2. 코드 수정 후 확인이 끝나면 그 자리에서 바로 `git add` → `git commit`(변경 내용을 알아볼 수 있는 커밋 메시지) → `git push` 한다. (구 규칙의 `파일.bak_YYYYMMDD설명` 수동 백업은 git 히스토리가 대신하지만, 실기 작업 중 즉시 롤백용 로컬 백업은 규칙 1-3대로 계속 병행)
-3. **서버(DAE-vlm-main/DAE_Backend-main)·프론트엔드(DAE_Frontend) 코드는 아직 이 정책 범위 밖** — git 전환 여부는 별도 결정 전까지 기존 방식 유지, 착수 전 사용자에게 확인.
+```
+docs/
+  md/     - CLAUDE.md 등 작업 규칙 문서
+  docs/   - 참고용 문서 (Drive 요약 등)
+jetson/
+  code/   - Jetson 코드 스냅샷(정리된 뷰) - main 브랜치
+  models/ - 양자화(TensorRT 컴파일) 전 원본 ONNX 모델
+server/
+  DAE-vlm-main / DAE_Backend-main / DAE_Frontend 소스코드만
+  (weights/videodata/wavdata/profiledata/secret.yaml 등은 .gitignore로 제외 -
+   서버의 /home/yunseon/Capstone/.gitignore 기준을 그대로 이식)
+```
 
-### 2-2. 문서 백업 (Google Drive, 기존 유지)
+- **`main` 브랜치**: 위 구조로 정리된 스냅샷. docs/server는 여기서 직접 관리.
+- **`jetson-live` 브랜치**: Jetson 실기의 `~/drone_2026/code/`가 **구조 변경 없이 그대로** 직접 push하는 브랜치(flat 구조, 전체 커밋 히스토리 보존). ⚠️ Jetson 실제 폴더명·경로는 "2026 연구자료" 성격상 앞으로도 `drone_2026`을 유지하기로 함 — git 저장소 안의 "jetson/" 이름은 어디 소속인지 구분하기 위한 것일 뿐, 실기 경로를 바꾸는 게 아님.
+- Jetson → GitHub 인증: 저장소 전용 배포키(`~/.ssh/id_ed25519_github_drone2026`, write 권한, repo 단위로 범위 한정, Jetson `~/.ssh/config`의 `Host github.com`이 사용). 계정 전체 권한 PAT 아님.
+- `.gitignore`(Jetson 쪽): `__pycache__/`, `logs/`, `test_videos/`, `*.engine`(TensorRT 엔진 — 하드웨어/버전 종속이라 백업 대상 아님, 필요시 재빌드) 제외.
 
-1. 정리본/세션 요약/서버팀 전달 문서 등은 계속 Google Drive에 백업한다 — 문서 폴더 (Drive folder ID: `1GJ__0BoT5DQHQnlRS7JMHGqUKYMnIFZk`).
-2. 백업 파일명 규칙: `원본파일명_변경내용요약_YYYYMMDD.확장자` (예: `세션정리_배터리버그수정_20260826.md`)
-3. 셸 스크립트 등 코드성 파일을 예외적으로 Drive에 올릴 일이 있으면 `mimeType: application/x-sh`로 업로드해 Google Docs로 자동 변환되지 않게 한다.
-4. (참고) 코드 백업 폴더였던 Drive `drone_2026` 코드 폴더(`1haFRU_3TFUCywBErE2zQIEAfp4SXHXxz`)는 git 전환 이후 더는 갱신하지 않는다 — 과거 이력 조회용으로만 남겨둠.
+### 2-2. 일상적인 커밋 워크플로
+
+1. **Jetson 코드**: 지금까지처럼 `~/drone_2026/code/`에서 직접 `git add` → `git commit` → `git push`(자동으로 `jetson-live` 브랜치로 감). 구 규칙의 `파일.bak_YYYYMMDD설명` 수동 백업은 git 히스토리가 대신하지만, 실기 작업 중 즉시 롤백용 로컬 백업은 규칙 1-3대로 계속 병행.
+2. **`main` 브랜치(docs/jetson 스냅샷/server)**: 이 PC(E:\univ)에서 관리. `jetson/code/`는 필요시 Jetson 최신 내용으로 수동 갱신(주기적 스냅샷 개념 - 실시간 동기 아님, 실제 이력의 원본은 `jetson-live` 브랜치).
+3. **서버 코드(server/)**: 소스코드만 반영, weights/videodata/wavdata/secret 등 대용량·민감정보는 절대 커밋하지 않는다 (서버의 `.gitignore` 기준 준수).
+4. 문서(세션정리 등)는 `docs/md/` 또는 `docs/docs/`에 마크다운으로 저장 후 커밋 (Drive 업로드 안 함).
 
 ## 3. 실기/서버 작업 원칙
 
