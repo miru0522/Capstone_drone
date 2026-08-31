@@ -11,6 +11,7 @@
 - 구성: FastAPI AI서버(DAE-vlm-main) + Spring Boot 백엔드(DAE_Backend-main) + React 프론트엔드(DAE_Frontend)
 - 서버: `203.249.90.3` (SSH 별칭 `HPC-server`, 계정 `yunseon`, host `hydro1`), 프로젝트 루트 `/home/yunseon/Capstone/`
 - 드론: Jetson(계정 `hpc@ubuntu`), 코드 경로 `~/drone_2026/code/`
+- 1차 이상탐지 모델(Jetson): VadCLIP(CLIP ViT-B/16 기반), 2026-08-31 Jigsaw-VAD/WideBranchNet에서 교체 완료 (branch `vadclip-v4-20260831`)
 - 통신: STOMP over WebSocket (`/ws`, SockJS 아님), 드론별 채널 `/topic/drones/{droneId}/commands`
 - 관제 접속: `http://203.249.90.3:8031` (nginx 리버스프록시, 8080/8000 직접 접속 불가)
 
@@ -56,6 +57,19 @@ server/
 3. **서버 코드(server/)**: 소스코드만 반영, weights/videodata/wavdata/secret 등 대용량·민감정보는 절대 커밋하지 않는다 (서버의 `.gitignore` 기준 준수).
 4. 문서(세션정리 등)는 `docs/md/` 또는 `docs/docs/`에 마크다운으로 저장 후 커밋 (Drive 업로드 안 함).
 
+### 2-3. VadCLIP 전환 이후 브랜치 현황 (2026-08-31 갱신)
+
+- Jetson은 `vadclip-v4-20260831` 브랜치에서 작업 중이다(HEAD `7123cfa`).
+- 2026-08-31: `origin/jetson-live`가 VadCLIP 이전(`c387b52`)에 정체돼 있던 것을 확인하고,
+  `vadclip-v4-20260831`을 `jetson-live`로 fast-forward push해 최신화했다
+  (`c387b52..7123cfa`). `Capstone_drone` repo `main` 브랜치의 `jetson/code/` 스냅샷도
+  같은 시점 git archive 기준으로 갱신·커밋·push 완료(`a10ca5e`, `e952c7b`).
+  이제 jetson-live/main 스냅샷/Jetson 로컬 상태가 모두 동일한 커밋(`7123cfa`)을 반영한다.
+- 앞으로 Jetson에서 `vadclip-v4-20260831`에 새 커밋을 쌓을 경우, 그 브랜치에서
+  `jetson-live`로 다시 fast-forward push해야 한다(자동 아님, 수동 확인 필요).
+  Jetson git 상태 확인 시 `jetson-live`뿐 아니라 현재 활성 브랜치도 함께 본다.
+- Rollback 기준점: `c387b52`(VadCLIP 이전 baseline) / branch `backup/pre-vadclip-20260828`.
+
 ## 3. 실기/서버 작업 원칙
 
 1. **안전이 최우선**이다. 특히 킬스위치/착륙/배터리 관련 로직은 절대 임의로 되돌리거나 단순화하지 않는다.
@@ -63,6 +77,11 @@ server/
 3. **문제 진단 시 드론 코드와 서버 코드 양쪽을 모두 확인**한다. 드론 로그만 보고 결론 내리지 않는다 — 서버(Spring Boot) 컨트롤러/서비스 코드와 `docker logs`도 함께 대조한다.
 4. 로그 파일은 `start_all.sh`/`stop_all.sh` 재시작 시 덮어써져 사라진다는 점을 항상 유의한다. 중요한 진단이 필요하면 재시작 전에 로그를 먼저 백업해두라고 안내한다.
 5. 원인 불명 문제가 재발할 가능성이 있으면, **다음에 확인 가능하도록 진단 로그(상태값, 스택트레이스 등)를 미리 보강**해둔다.
+6. **VadCLIP(main.py) 재시작은 `start_all.sh` 전체 재기동이 아니라 main.py 프로세스만** 종료 후 재시작한다 — 전체 재기동은 다른 팀원의 mavsdk_server/telemetry_sender/command_receiver까지 불필요하게 건드릴 수 있다.
+7. `pkill python3` 금지 — VadCLIP main 외 다른 Python 프로세스까지 함께 종료될 수 있다.
+8. `dae_*` 프로세스 종료 금지 — 팀원(서버측) 서비스 영역이다.
+9. 카메라 이중 점유 금지 — main.py가 CSI 카메라를 사용 중일 때 별도 카메라 runtime을 동시에 실행하지 않는다(CaptureSession 충돌 원인).
+10. Jetson 핵심 패키지(torch/CUDA/TensorRT/OpenCV) 조합을 임의로 재설치·업그레이드하지 않는다.
 
 ## 4. 문서 작성 원칙
 
@@ -80,3 +99,10 @@ server/
 
 - 새 세션(또는 새 Claude Code 세션) 시작 시, Capstone_drone 저장소 `docs/docs/`의 최신 세션정리 문서를 먼저 확인해 맥락을 파악한다(2026-08-27 이전 문서는 Drive 문서 폴더에 남아있음 - 과거 이력용).
 - 이 프로젝트는 서버측 스펙이 계속 바뀌는 협업 구조이므로, 최근 서버팀 안내문/회신 문서가 있으면 우선 반영 상태를 재확인한다.
+
+### 6-1. VadCLIP 재탑재 이후 미완료 작업 (2026-08-31 기준, 근거: `VadCLIP_모델_재탑재_및_Edge-Server_인수인계_20260831`)
+
+- **P0**: 실제 Pixhawk `hover_now()` 안전 시험 — 현재까지 전부 MOCK hover로만 검증됨, 실비행/지상 안전 조건 및 관제·비행팀 합의 필요.
+- **P0**: Threshold calibration — 현재 `ANOMALY_THRESHOLD=0.4073`은 UCF-Crime 기준 통합용 임시값, 드론 실데이터로 재보정 필요.
+- P1: 실제 이상(폭력/절도/사고) recall 검증, 장시간 운영 시험(메모리/온도/오류), 서버 4-class 원시 로그 연동 확인.
+- 위 P0 항목들은 안전/성능에 직결되므로 임의로 스킵하지 말고, 진행 전 사용자에게 먼저 확인한다.
