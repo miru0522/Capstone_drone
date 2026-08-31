@@ -8,8 +8,8 @@ CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 
   3. 호버링 상태 유지 (재개는 command_receiver.py가 STOMP로 받는
      별도 명령으로 처리 예정 - 아직 서버와 재개 명령 형식 미정)
 
-주의: detect_anomaly()는 아직 더미(0.0 고정). 실제 모델 연결 전까지
-      트리거/호버링 자체는 강제 테스트로만 확인 가능.
+Edge 이상탐지는 VadCLIP으로 동작한다. 기존 Jigsaw-VAD/WideBranchNet은
+Git 기준본으로 롤백 가능하며, downstream 트리거/전송/호버링 인터페이스는 유지한다.
 """
 
 import os
@@ -19,6 +19,7 @@ import signal
 import sys
 import asyncio
 import threading
+import queue
 from typing import Optional
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -41,13 +42,15 @@ logger = logging.getLogger("main")
 # ─── 카메라 설정 ──────────────────────────────────────────────────
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
-ANOMALY_THRESHOLD = 0.8     # 트리거 임계값 (모델 도입 후 튜닝 필요)
+# VadCLIP UCF-Crime 기준의 임시 통합 임계값. 드론 도메인 calibration 전까지
+# 운영 최종값으로 간주하지 않으며 환경변수로 즉시 교체할 수 있다.
+ANOMALY_THRESHOLD = float(os.environ.get("ANOMALY_THRESHOLD", "0.4073"))
 TRIGGER_COOLDOWN_SEC = 9    # 같은 클립을 중복 전송하지 않도록 쿨다운
 
-# ★2026-08-26: 매 프레임 추론 대신 2초에 한 번만 추론하도록 스로틀링.
-# 자체추론+스트리밍 동시 진행 시 캡처 프레임 드롭/스트리밍 끊김이 보고돼,
-# 캡처 루프가 무거운 YOLO+WBN 추론에 밀리는 걸 완화하기 위함.
-INFERENCE_INTERVAL_FRAMES = FPS * 2  # 18프레임 (FPS=9 기준)
+# VadCLIP 한 판정은 10 snippet을 feature buffer에 추가한다. 9fps 라이브에서
+# 약 5.33초(48프레임) 창을 모두 소비한 뒤 다음 판정을 수행해, 겹치는 창에서
+# 동일 시간대 feature가 중복 push되는 것을 막는다.
+INFERENCE_INTERVAL_FRAMES = INFER_WINDOW_LEN
 
 # ─── 실시간 스트리밍 설정 (테스트/Tailscale 직결 전용) ─────────────
 STREAM_ENABLED = os.environ.get("STREAM_ENABLED", "1") == "1"
@@ -62,7 +65,7 @@ STREAM_REQUEST_STATE_PATH = os.environ.get("STREAM_REQUEST_STATE_PATH", "/tmp/dr
 # (STOMP에 영상을 얹으면 EMERGENCY_STOP 등 제어명령이 영상 프레임
 #  뒤에 큐잉되어 늦게 도착하는 안전문제가 있다는 서버팀 설명 반영)
 SERVER_HOST = os.environ.get("SERVER_URL", "http://203.249.90.3:8031")
-DEVICE_KEY = os.environ.get("DEVICE_KEY", "")
+DEVICE_KEY = os.environ.get("DEVICE_KEY", "HPC-2026")
 STREAM_FRAME_TIMEOUT_SEC = 5.0     # 프레임 1장 업로드 타임아웃
 STREAM_NO_RESPONSE_LIMIT_SEC = 10.0  # 이 시간 무응답이면 자체 중지 (서버 확정 스펙)
 MAVSDK_URI = "serial:///dev/pixhawk:115200"
@@ -99,8 +102,8 @@ _consecutive_inference_failures = 0
 
 def detect_anomaly(window: np.ndarray) -> float:
     """
-    YOLOv5n + WideBranchNet(Jigsaw-VAD) 실제 추론.
-    window: (T,H,W,C) BGR uint8, T=9 (1초, ring_buffer INFER_WINDOW_SECONDS=1)
+    VadCLIP 실제 추론.
+    window: (T,H,W,C) BGR uint8, T=INFER_WINDOW_LEN(기본 48, 약 5.33초 @ 9fps)
     반환: anomaly_score 0.0~1.0 (높을수록 이상)
     """
     global _consecutive_inference_failures
@@ -419,6 +422,11 @@ class CameraAnomalyPipeline:
         self.hover = hover_controller
         self.latest_frame_for_stream = None  # MJPEGStreamServer가 읽어가는 최신 프레임
 
+        # VadCLIP 추론은 약 0.8초가 걸리므로 캡처 루프와 분리한다.
+        # queue는 1개만 유지하며, 밀릴 경우 오래된 대기 window를 버리고 최신 window로 교체한다.
+        self._inference_queue = queue.Queue(maxsize=1)
+        self._inference_thread: Optional[threading.Thread] = None
+
         if STREAM_ENABLED:
             self._stream_server = MJPEGStreamServer(self, STREAM_PORT)
             self._stream_server.start()
@@ -432,11 +440,24 @@ class CameraAnomalyPipeline:
         self._stream_uploader.start()
 
     def initialize_camera(self) -> None:
+        # Jetson Xavier NX는 VadCLIP/PyTorch가 먼저 대규모 메모리를 점유하면
+        # Argus/NVMM CaptureSession 생성에 필요한 연속 메모리 확보가 실패할 수 있다.
+        # 따라서 모델 로드 전에 카메라 세션을 먼저 만들고 실제 첫 프레임까지 확인한다.
+        if self.cap is not None and self.cap.isOpened():
+            return
+
         pipeline = create_gstreamer_pipeline()
         self.cap = cv2.VideoCapture(pipeline, cv2.CAP_GSTREAMER)
         if not self.cap.isOpened():
+            self.release_camera()
             raise RuntimeError("CSI 카메라를 열 수 없습니다 (GStreamer 파이프라인 실패)")
-        logger.info("CSI 카메라 초기화 완료")
+
+        ret, _frame = self.cap.read()
+        if not ret:
+            self.release_camera()
+            raise RuntimeError("CSI 카메라 CaptureSession은 열렸지만 첫 프레임 획득에 실패했습니다")
+
+        logger.info("CSI 카메라 초기화 및 첫 프레임 확인 완료")
 
     def release_camera(self) -> None:
         if self.cap is not None:
@@ -450,9 +471,64 @@ class CameraAnomalyPipeline:
             return True
         return False
 
+    def _handle_anomaly_score(self, score: float) -> None:
+        if not self._check_trigger(score):
+            return
+
+        logger.info(f"⚠️ 이상 감지 트리거 발생 (score={score:.3f})")
+        self.hover.hover_now()
+
+        snapshot = self.buffer.get_full_buffer()
+        logger.info("영상 전송 중 (서버 응답 대기, 최대 180초)...")
+        result = upload_clip_sync(snapshot, anomaly_score=score)
+        if result:
+            logger.info(f"서버 응답 수신: {result}")
+        else:
+            logger.warning("서버 응답 없음/실패")
+        logger.info("[Hover] 호버링 유지 중 - 관제사 명령 무한 대기 (command_receiver.py 경유)")
+
+    def _inference_loop(self) -> None:
+        logger.info("VadCLIP 추론 worker 시작")
+        while self._running:
+            try:
+                window = self._inference_queue.get(timeout=0.5)
+            except queue.Empty:
+                continue
+            try:
+                score = detect_anomaly(window)
+                self._handle_anomaly_score(score)
+            except Exception:
+                logger.exception("VadCLIP inference worker 예외")
+            finally:
+                self._inference_queue.task_done()
+
+    def _submit_inference(self, window: np.ndarray) -> None:
+        # 정상 상태에서는 추론(~0.8s) << 주기(5.33s)라 queue가 비어 있어야 한다.
+        # 서버 업로드 등으로 worker가 오래 막히면 오래된 대기 window 대신 최신 window만 보존한다.
+        try:
+            self._inference_queue.put_nowait(window)
+            return
+        except queue.Full:
+            pass
+
+        try:
+            _ = self._inference_queue.get_nowait()
+            self._inference_queue.task_done()
+            logger.warning("VadCLIP worker 지연: 대기 중인 오래된 window를 최신 window로 교체")
+        except queue.Empty:
+            pass
+        try:
+            self._inference_queue.put_nowait(window)
+        except queue.Full:
+            logger.warning("VadCLIP worker queue 갱신 실패 - 이번 window 스킵")
+
     def run(self) -> None:
-        self.initialize_camera()
+        # __main__에서 VadCLIP보다 먼저 카메라를 선점한 경우 재오픈하지 않는다.
+        if self.cap is None or not self.cap.isOpened():
+            self.initialize_camera()
         self._running = True
+        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
+        self._inference_thread.start()
         frame_interval = 1.0 / FPS
         next_tick = time.time()
 
@@ -467,7 +543,7 @@ class CameraAnomalyPipeline:
 
         logger.info(
             f"캡처 루프 시작 (FPS={FPS}, 버퍼={BUFFER_MAXLEN}프레임/{BUFFER_MAXLEN/FPS:.0f}초, "
-            f"추론주기={INFERENCE_INTERVAL_FRAMES}프레임/{INFERENCE_INTERVAL_FRAMES/FPS:.0f}초)"
+            f"추론주기={INFERENCE_INTERVAL_FRAMES}프레임/{INFERENCE_INTERVAL_FRAMES/FPS:.2f}초)"
         )
 
         try:
@@ -481,39 +557,14 @@ class CameraAnomalyPipeline:
                 self.buffer.push(frame)
                 self.latest_frame_for_stream = frame  # 스트리밍용 최신 프레임 갱신
 
-                # ★2026-08-26: 매 프레임 대신 INFERENCE_INTERVAL_FRAMES(2초)마다
-                # 한 번만 슬라이딩 윈도우 추론 (캡처/스트리밍 부하 완화)
+                # VadCLIP: INFERENCE_INTERVAL_FRAMES(기본 48프레임 ≈ 5.33초)마다
+                # 한 번씩 비중첩 시간 창을 추론한다. 각 호출은 새 10 snippet을
+                # VadCLIP rolling feature buffer에 추가한다.
                 inference_counter += 1
                 if self.buffer.is_ready_for_inference() and inference_counter >= INFERENCE_INTERVAL_FRAMES:
                     inference_counter = 0
                     window = self.buffer.get_latest_window(INFER_WINDOW_LEN)
-                    score = detect_anomaly(window)
-
-                    if self._check_trigger(score):
-                        logger.info(f"⚠️ 이상 감지 트리거 발생 (score={score:.3f})")
-
-                        # 1. 즉시 호버링
-                        self.hover.hover_now()
-
-                        # 2. 영상 전송 (동기 - 서버 응답 대기.
-                        #    ★2026-07-18 공지: 응답에는 상태코드만 옴,
-                        #    ttsAudioBase64 없음. 오디오는 STOMP로 별도 수신
-                        #    (command_receiver.py의 PLAY_AUDIO 처리)
-                        snapshot = self.buffer.get_full_buffer()
-                        logger.info("영상 전송 중 (서버 응답 대기, 최대 180초)...")
-                        result = upload_clip_sync(snapshot, anomaly_score=score)
-
-                        if result:
-                            logger.info(f"서버 응답 수신: {result}")
-                        else:
-                            logger.warning("서버 응답 없음/실패")
-
-                        # 3. ★서버-드론팀 확정 사항: 재생/판정과 무관하게 자동 재개 안 함.
-                        #    관제사가 STOMP로 PLAY_AUDIO(오디오) 또는
-                        #    재개명령(START_PATROL/ROUTE_UPDATE)을 보낼 때까지
-                        #    호버링 상태를 무한 유지함 (command_receiver.py가
-                        #    별도 프로세스로 그 명령들을 수신해 처리).
-                        logger.info("[Hover] 호버링 유지 중 - 관제사 명령 무한 대기 (command_receiver.py 경유)")
+                    self._submit_inference(window)
 
                 # FPS 페이싱 (목표 9fps 유지)
                 next_tick += frame_interval
@@ -561,4 +612,15 @@ if __name__ == "__main__":
     pipeline = CameraAnomalyPipeline(hover_controller)
     signal.signal(signal.SIGINT, _signal_handler(pipeline))
     signal.signal(signal.SIGTERM, _signal_handler(pipeline))
-    pipeline.run()
+
+    # 중요: Xavier NX 통합 메모리에서는 VadCLIP/PyTorch를 먼저 로드하면
+    # Argus CaptureSession용 NVMM 연속 메모리 확보가 실패할 수 있다.
+    # 카메라 세션과 첫 프레임을 먼저 확보한 뒤 모델을 로드/warmup한다.
+    # warmup 후 실제 추론은 별도 worker에서 실행되어 9fps 캡처를 막지 않는다.
+    try:
+        pipeline.initialize_camera()
+        get_anomaly_pipeline().warmup()
+        pipeline.run()
+    except Exception:
+        pipeline.release_camera()
+        raise

@@ -3,11 +3,13 @@ ring_buffer.py
 CSI 카메라에서 들어오는 프레임을 메모리 내 deque로 순환 저장하는 링 버퍼.
 
 설계 파라미터:
-    - FPS: 9
-    - 버퍼 길이: 9초 (81 프레임)
-    - 추론 창: 1초 (9 프레임, 슬라이딩 윈도우) — WideBranchNet 입력 요구사항
-      (★2026-08-26: docstring이 실제 INFER_WINDOW_SECONDS=1과 어긋나 있던
-      것을 수정. main.py detect_anomaly()의 T=9(1초) 설명과 일치시킴)
+    - 카메라 FPS: 9
+    - 전송 버퍼: 9초 (81 프레임)
+    - VadCLIP 추론 창: 약 5.33초 (48 프레임 @ 9fps)
+
+VadCLIP UCF-Crime feature 규약은 30fps 기준 16-frame stride이고,
+한 번의 Edge 판정에서 10 snippet을 추가한다. 라이브 카메라는 9fps이므로
+동일한 시간 간격(16/30초)을 보존하도록 약 48프레임을 한 판정 창으로 사용한다.
 """
 
 import time
@@ -22,10 +24,17 @@ import numpy as np
 # ─── 설정값 ──────────────────────────────────────────────────────
 FPS = 9
 BUFFER_SECONDS = 9
-INFER_WINDOW_SECONDS = 1  # WideBranchNet 모델 요구사항: 9프레임(1초) 단위
 
-BUFFER_MAXLEN = FPS * BUFFER_SECONDS          # 81 프레임
-INFER_WINDOW_LEN = FPS * INFER_WINDOW_SECONDS  # 45 프레임
+# VadCLIP의 학습/공식 feature 시간축 규약
+VADCLIP_REFERENCE_FPS = 30.0
+VADCLIP_STRIDE = 16
+VADCLIP_SNIPPETS_PER_WINDOW = 10
+
+BUFFER_MAXLEN = FPS * BUFFER_SECONDS  # 81 프레임
+INFER_WINDOW_SECONDS = (
+    VADCLIP_STRIDE * VADCLIP_SNIPPETS_PER_WINDOW / VADCLIP_REFERENCE_FPS
+)  # 5.333...초
+INFER_WINDOW_LEN = round(FPS * INFER_WINDOW_SECONDS)  # 48 프레임 @ 9fps
 
 
 @dataclass
