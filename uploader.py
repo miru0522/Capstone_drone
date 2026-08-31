@@ -53,9 +53,11 @@ def _h264_gstreamer_pipeline(path: str, w: int, h: int, fps: int) -> str:
 
 def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
     """
-    프레임 리스트 → H.264 mp4 임시파일 경로. 호출자가 삭제 책임.
-    Jetson 하드웨어 인코더(GStreamer nvv4l2h264enc) 우선 사용.
-    실패 시 OpenCV 소프트웨어 인코더(mp4v)로 폴백.
+    프레임 리스트를 MP4 임시파일로 인코딩하고 경로를 반환.
+    Jetson의 nvv4l2h264enc 경로는 VideoWriter가 열린 뒤
+    write/release 단계에서 hang되는 현상이 확인되어 사용하지 않는다.
+    검증된 OpenCV mp4v 인코더를 사용한다.
+    호출자가 반환된 임시파일을 삭제할 책임이 있다.
     """
     if not frames:
         raise ValueError("encode_frames_to_mp4: 빈 프레임 리스트")
@@ -64,27 +66,33 @@ def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
     fd, path = tempfile.mkstemp(suffix=".mp4", prefix="anomaly_clip_")
     os.close(fd)
 
-    pipeline = _h264_gstreamer_pipeline(path, w, h, fps)
-    writer = cv2.VideoWriter(pipeline, cv2.CAP_GSTREAMER, 0, fps, (w, h), True)
-
-    if writer.isOpened():
-        logger.info("H.264 하드웨어 인코더(nvv4l2h264enc) 사용")
-        try:
-            for entry in frames:
-                writer.write(entry.frame)
-        finally:
-            writer.release()
-        return path
-
-    # 폴백: 하드웨어 인코더 파이프라인 실패 시 소프트웨어 mp4v
-    logger.warning("GStreamer H.264 파이프라인 열기 실패 — mp4v 폴백 사용")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     writer = cv2.VideoWriter(path, fourcc, fps, (w, h))
+
+    if not writer.isOpened():
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise RuntimeError("OpenCV mp4v VideoWriter 열기 실패")
+
     try:
         for entry in frames:
             writer.write(entry.frame)
     finally:
         writer.release()
+
+    if not os.path.exists(path) or os.path.getsize(path) <= 0:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise RuntimeError("MP4 인코딩 결과 파일이 비어 있음")
+
+    logger.info(
+        "mp4v 인코딩 완료: frames=%d, fps=%d, size=%d bytes",
+        len(frames), fps, os.path.getsize(path)
+    )
 
     return path
 
