@@ -133,12 +133,9 @@ STREAM_REQUEST_STATE_PATH = os.environ.get("STREAM_REQUEST_STATE_PATH", "/tmp/dr
 
 # ★2026-08-21 서버 확정 스펙: 프레임은 HTTP(POST /drones/{droneId}/stream/frame)로
 # 원본 JPEG 바이너리 전송(base64 아님). REQUEST_STREAM이 값을 안 주면 아래 기본값 사용.
-# ★2026-09-03: 기본 해상도를 캡처 파이프라인 네이티브 해상도(1280x720, main.py
-# CAMERA_WIDTH/HEIGHT와 동일)까지 상향. 이보다 크게 요청해도 main.py의
-# cv2.resize가 원본 프레임을 업스케일할 뿐 실제 화질 이득은 없음.
 STREAM_DEFAULT_FPS = 5
-STREAM_DEFAULT_WIDTH = 1280
-STREAM_DEFAULT_HEIGHT = 720
+STREAM_DEFAULT_WIDTH = 640
+STREAM_DEFAULT_HEIGHT = 480
 STREAM_DEFAULT_QUALITY = 70
 
 
