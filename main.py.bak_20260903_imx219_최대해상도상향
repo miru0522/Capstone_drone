@@ -40,12 +40,8 @@ logger = logging.getLogger("main")
 
 
 # ─── 카메라 설정 ──────────────────────────────────────────────────
-# ★2026-09-03: IMX219 mode2(1920x1080, 30fps 상한)로 화질 상향 시도.
-# 8MP(mode0, 3280x2464)는 메모리부족(NvMapMemHandleAlloc)으로 실기 전체가
-# 응답불가 상태까지 갔던 전력이 있어 그보다 한 단계 낮은 해상도로 검증 중.
-# 문제 시 sensor-mode=4, 1280x720(CAMERA_WIDTH/HEIGHT=1280/720)로 롤백.
-CAMERA_WIDTH = 1920
-CAMERA_HEIGHT = 1080
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
 # VadCLIP UCF-Crime 기준의 임시 통합 임계값. 드론 도메인 calibration 전까지
 # 운영 최종값으로 간주하지 않으며 환경변수로 즉시 교체할 수 있다.
 ANOMALY_THRESHOLD = float(os.environ.get("ANOMALY_THRESHOLD", "0.4073"))
@@ -78,7 +74,7 @@ MAVSDK_URI = "serial:///dev/pixhawk:115200"
 def create_gstreamer_pipeline(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, fps=FPS) -> str:
     """CSI 카메라용 GStreamer 파이프라인 문자열 생성."""
     return (
-        f"nvarguscamerasrc sensor_id=0 sensor-mode=2 ! "
+        f"nvarguscamerasrc sensor_id=0 sensor-mode=4 ! "
         f"video/x-raw(memory:NVMM), width={width}, height={height}, "
         f"format=NV12, framerate={fps}/1 ! "
         f"nvvidconv flip-method=0 ! "
