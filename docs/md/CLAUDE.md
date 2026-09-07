@@ -57,18 +57,25 @@ server/
 3. **서버 코드(server/)**: 소스코드만 반영, weights/videodata/wavdata/secret 등 대용량·민감정보는 절대 커밋하지 않는다 (서버의 `.gitignore` 기준 준수).
 4. 문서(세션정리 등)는 `docs/md/` 또는 `docs/docs/`에 마크다운으로 저장 후 커밋 (Drive 업로드 안 함).
 
-### 2-3. VadCLIP 전환 이후 브랜치 현황 (2026-08-31 갱신)
+### 2-3. VadCLIP 전환 이후 브랜치 현황 (2026-09-07 갱신)
 
-- Jetson은 `vadclip-v4-20260831` 브랜치에서 작업 중이다(HEAD `7123cfa`).
-- 2026-08-31: `origin/jetson-live`가 VadCLIP 이전(`c387b52`)에 정체돼 있던 것을 확인하고,
-  `vadclip-v4-20260831`을 `jetson-live`로 fast-forward push해 최신화했다
-  (`c387b52..7123cfa`). `Capstone_drone` repo `main` 브랜치의 `jetson/code/` 스냅샷도
-  같은 시점 git archive 기준으로 갱신·커밋·push 완료(`a10ca5e`, `e952c7b`).
-  이제 jetson-live/main 스냅샷/Jetson 로컬 상태가 모두 동일한 커밋(`7123cfa`)을 반영한다.
+- Jetson은 `vadclip-v4-20260831` 브랜치에서 작업 중이다(HEAD `76d0c7e`).
+- 2026-08-31: `jetson-live`를 `vadclip-v4-20260831`로 fast-forward(`c387b52..7123cfa`),
+  `main`의 `jetson/code/` 스냅샷도 동일 시점 갱신(`a10ca5e`, `e952c7b`).
+- 2026-09-07: 팀원이 로컬에서 진행하던 VadCLIP TensorRT 최적화 + V6 비동기 업로드
+  작업(`anomaly_model_trt.py`/`vadclip_adapter_trt.py`, `main.py` 업로드 워커 분리 등,
+  18개 파일)이 미커밋 상태였던 것을 발견 → 셸 오작동으로 생긴 정크 파일 10개 삭제 후
+  커밋(`76d0c7e`)·push. `jetson-live`도 같은 커밋으로 fast-forward(`4d86f86..76d0c7e`),
+  `main`의 `jetson/code/` 스냅샷도 갱신(`841ffd1`). 이제 jetson-live/main 스냅샷/Jetson
+  로컬 상태가 모두 `76d0c7e`를 반영한다.
+  - V6는 10분 안정성 테스트(`128_v6_stability_10min.py`)는 PASS했으나(capture_fps~8.84,
+    업로드 2건 성공, 예외 없음), **실제 이상 트리거→hover 연동은 이 테스트 범위 밖**
+    (`dummy_hover_calls=0`)이라 검증되지 않았다. 6-1절 미완료 작업 참고.
 - 앞으로 Jetson에서 `vadclip-v4-20260831`에 새 커밋을 쌓을 경우, 그 브랜치에서
   `jetson-live`로 다시 fast-forward push해야 한다(자동 아님, 수동 확인 필요).
   Jetson git 상태 확인 시 `jetson-live`뿐 아니라 현재 활성 브랜치도 함께 본다.
-- Rollback 기준점: `c387b52`(VadCLIP 이전 baseline) / branch `backup/pre-vadclip-20260828`.
+- Rollback 기준점: `c387b52`(VadCLIP 이전 baseline) / branch `backup/pre-vadclip-20260828`,
+  또는 `main.py.pre_v6_20260906_220842`(V6 직전 main.py 백업, 팀원이 남김).
 
 ## 3. 실기/서버 작업 원칙
 
@@ -107,19 +114,13 @@ server/
 - P1: 실제 이상(폭력/절도/사고) recall 검증, 장시간 운영 시험(메모리/온도/오류), 서버 4-class 원시 로그 연동 확인.
 - 위 P0 항목들은 안전/성능에 직결되므로 임의로 스킵하지 말고, 진행 전 사용자에게 먼저 확인한다.
 
-### 6-2. 카메라(IMX219) 교체 및 해상도 상향 (2026-09-03 갱신, 근거: `세션정리_카메라교체_해상도상향_20260903`)
+### 6-2. VadCLIP TensorRT/V6 비동기 업로드 전환 (2026-09-07 기준)
 
-- **⚠️ 중요 하드웨어 규칙 신규 추가**: CSI 카메라를 **전원이 켜진 채로 교체(hot-swap)하면 안 된다.** 이번에 IMX219로 교체 후 Jetson을 재부팅하지 않아 `nvargus-daemon`이 새 센서를 재초기화하지 못했고, 증상이 `NvBufSurfaceFromFd Failed`/`dmabuf_fd` 에러로 나타났다. daemon 재시작만으로는 해결 안 됐고 **Jetson 전체 재부팅**으로 해결됨. **카메라 모듈 교체 후에는 항상 Jetson을 재부팅할 것.**
-- 카메라 해상도: 기존 `sensor-mode=4`(1280x720)에서 **`sensor-mode=2`(1920x1080)로 상향, 적용 완료 및 git 커밋됨**. 15분 소크테스트(5초 간격 179샘플, 3분 단위 집계) 결과 RAM 4.9GB대/CPU 9%대/온도 45~46°C로 전 구간 안정 — 누수·발열 추세 없음.
-- **`sensor-mode=0`(3280x2464, IMX219 물리적 최대해상도)은 사용 금지.** `NvMapMemHandleAlloc error 12`(메모리부족)로 VadCLIP 추론이 무너지고(밀린시간 8초+ 누적), 재현 시 **Jetson 전체가 네트워크 응답불가(SSH/ping 100% 손실) 상태까지 감** — 물리적 전원 재시작 외에 복구 불가했음. 시도 기록은 `main.py.bak_20260903_imx219_최대해상도상향`에 보존.
-- 스트리밍 기본해상도(`command_receiver.py`의 `STREAM_DEFAULT_WIDTH/HEIGHT`)를 640x480 → 1280x720으로 상향 커밋함. 단 **서버(`StreamController.java`)가 `REQUEST_STREAM`에 `width=640,height=480`을 항상 명시적으로 못박아 보내는 중**이라, 서버측 상수를 같이 안 바꾸면 드론쪽 기본값 상향은 체감 효과가 없음 — 서버팀 협의 필요 (아래 "다음에 할 일" 참고).
-- **실시간 영상(관제 대시보드)이 재생 안 되는 문제 발견, 원인 절반 진단**: 드론→서버 프레임 업로드는 정상 시도되나 서버가 계속 `410 Gone` 응답. `StreamController.java`/`StreamService.java` 코드 확인 결과, 서버는 `GET /drones/{id}/stream`(브라우저 `<img>` 태그, 시청자 등록용) 연결이 없으면 시청자 0명으로 판단해 410을 보낸다. 즉 `POST /stream/start`(REQUEST_STREAM 발송)는 되는데 `GET /stream`(실제 영상 수신) 쪽이 브라우저에서 안 붙는 것으로 추정 — **브라우저 개발자도구 Network 탭에서 `/drones/DR-01/stream` 응답 상태 확인 필요** (프론트/서버팀 영역, 미해결).
-- `test_telemetry_sender.py`에 이미 가짜 배터리/GPS 테스트 모드가 구현되어 있음을 재확인 (`python3 test_telemetry_sender.py <1|2|3>`, 모드3=가짜GPS+가짜배터리77%, `FAKE_BATT_PERCENT=77.0`). `start_all.sh` 자체에는 인자 처리 로직 없음(고정 4프로세스만 기동) — 필요시 `start_all.sh` 실행 후 별도로 `test_telemetry_sender.py`를 추가 실행해야 함.
-- 배터리 %는 100~1%=배터리 연결, 0%=배터리 제거 개발모드, -100%=배터리 연결 후 분리 개발모드 컨벤션 확인.
-
-**다음에 할 일**:
-1. 실시간 영상 미재생 문제 — 브라우저 Network 탭으로 `GET /drones/{id}/stream` 실제 응답 확인 후 프론트/서버팀과 원인 좁히기
-2. 스트리밍 해상도를 실제로 올리려면 서버팀에 `StreamController.java`의 `WIDTH=640,HEIGHT=480` 상수를 최대 1920(캡처 네이티브)까지 올려달라고 요청
-3. P0 항목(`hover_now()` 실비행 안전시험, threshold calibration)은 여전히 미착수 — 최우선
-4. 1920x1080 15분 소크테스트는 정지 상태(호버링/이상감지만) 기준이었음 — 실비행 중 부하는 별도 검증 필요
-5. `main` 브랜치의 `jetson/code/` 스냅샷은 아직 이번 세션 커밋 반영 전 (선택 작업, 필요시 갱신)
+- `anomaly_model_trt.py`/`vadclip_adapter_trt.py`(TensorRT 최적화)와 `main.py`의 업로드
+  워커 분리(V6, 서버 응답 대기 중에도 VadCLIP 추론이 멈추지 않도록) 적용됨.
+- 10분 안정성 테스트(`128_v6_stability_10min.py`) PASS: capture_fps~8.84, 예외 없음,
+  업로드 2건 성공. 단 이 테스트는 **실제 이상 트리거→hover 연동을 검증하지 않았다**
+  (`dummy_hover_calls=0`, score도 threshold 미달 범위에서만 측정됨).
+- **P0**: 실제(또는 최소 MOCK) 트리거 스코어로 hover 경로까지 통과하는 통합 테스트 필요 —
+  10분 안정성 테스트가 곧 트리거/호버링 검증이라고 착각하지 말 것.
+- 롤백 필요 시 `main.py.pre_v6_20260906_220842`(팀원이 V6 적용 직전 남긴 백업) 참고.
