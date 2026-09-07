@@ -1,4 +1,3 @@
-# TRT V6 MEMORY-SAFE ASYNC-UPLOAD COPY — original main.py/v4/v5 unchanged
 """
 main.py
 CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 호버링
@@ -29,29 +28,20 @@ import numpy as np
 import requests
 from mavsdk import System
 
-from ring_buffer import RingBuffer, FrameEntry, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
+from ring_buffer import RingBuffer, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
 from uploader import upload_clip_async, upload_clip_sync
-from anomaly_model_trt import AnomalyPipeline
+from anomaly_model import AnomalyPipeline
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("main_v4_trt")
-
-# V6: live CSI / VadCLIP input resolution is unchanged.
-# Only the anomaly clip queued to the upload worker is reduced.
-UPLOAD_CLIP_WIDTH = int(os.environ.get("UPLOAD_CLIP_WIDTH", "960"))
-UPLOAD_CLIP_HEIGHT = int(os.environ.get("UPLOAD_CLIP_HEIGHT", "540"))
+logger = logging.getLogger("main")
 
 
 # ─── 카메라 설정 ──────────────────────────────────────────────────
-# ★2026-09-03: IMX219 mode2(1920x1080, 30fps 상한)로 화질 상향 시도.
-# 8MP(mode0, 3280x2464)는 메모리부족(NvMapMemHandleAlloc)으로 실기 전체가
-# 응답불가 상태까지 갔던 전력이 있어 그보다 한 단계 낮은 해상도로 검증 중.
-# 문제 시 sensor-mode=4, 1280x720(CAMERA_WIDTH/HEIGHT=1280/720)로 롤백.
-CAMERA_WIDTH = 1920
-CAMERA_HEIGHT = 1080
+CAMERA_WIDTH = 1280
+CAMERA_HEIGHT = 720
 # VadCLIP UCF-Crime 기준의 임시 통합 임계값. 드론 도메인 calibration 전까지
 # 운영 최종값으로 간주하지 않으며 환경변수로 즉시 교체할 수 있다.
 ANOMALY_THRESHOLD = float(os.environ.get("ANOMALY_THRESHOLD", "0.4073"))
@@ -84,7 +74,7 @@ MAVSDK_URI = "serial:///dev/pixhawk:115200"
 def create_gstreamer_pipeline(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, fps=FPS) -> str:
     """CSI 카메라용 GStreamer 파이프라인 문자열 생성."""
     return (
-        f"nvarguscamerasrc sensor_id=0 sensor-mode=2 ! "
+        f"nvarguscamerasrc sensor_id=0 sensor-mode=4 ! "
         f"video/x-raw(memory:NVMM), width={width}, height={height}, "
         f"format=NV12, framerate={fps}/1 ! "
         f"nvvidconv flip-method=0 ! "
@@ -432,18 +422,10 @@ class CameraAnomalyPipeline:
         self.hover = hover_controller
         self.latest_frame_for_stream = None  # MJPEGStreamServer가 읽어가는 최신 프레임
 
-        # VadCLIP 추론은 캡처 루프와 분리한다.
+        # VadCLIP 추론은 약 0.8초가 걸리므로 캡처 루프와 분리한다.
         # queue는 1개만 유지하며, 밀릴 경우 오래된 대기 window를 버리고 최신 window로 교체한다.
         self._inference_queue = queue.Queue(maxsize=1)
         self._inference_thread: Optional[threading.Thread] = None
-
-        # V5: 이상 clip 인코딩 + /analyze-video 업로드를 VadCLIP inference worker와 분리.
-        # 서버 응답은 최대 180초까지 걸릴 수 있으므로 inference worker에서 sync upload를
-        # 직접 수행하면 그 시간 동안 새 VadCLIP 판정이 정지한다.
-        # outstanding upload는 최대 1개만 허용해 Xavier NX backlog를 막는다.
-        self._upload_queue = queue.Queue(maxsize=1)
-        self._upload_thread: Optional[threading.Thread] = None
-        self._upload_busy = threading.Event()
 
         if STREAM_ENABLED:
             self._stream_server = MJPEGStreamServer(self, STREAM_PORT)
@@ -489,32 +471,6 @@ class CameraAnomalyPipeline:
             return True
         return False
 
-    def _make_upload_snapshot(self):
-        full = self.buffer.get_full_buffer()
-        if not full:
-            return []
-
-        t0 = time.time()
-        reduced = []
-        full.reverse()
-        while full:
-            entry = full.pop()
-            frame_small = cv2.resize(
-                entry.frame,
-                (UPLOAD_CLIP_WIDTH, UPLOAD_CLIP_HEIGHT),
-                interpolation=cv2.INTER_AREA,
-            )
-            reduced.append(
-                FrameEntry(frame=frame_small, timestamp=entry.timestamp)
-            )
-
-        elapsed_ms = (time.time() - t0) * 1000.0
-        logger.info(
-            "V6 upload snapshot 준비: frames=%d, resolution=%dx%d, elapsed=%.1fms",
-            len(reduced), UPLOAD_CLIP_WIDTH, UPLOAD_CLIP_HEIGHT, elapsed_ms
-        )
-        return reduced
-
     def _handle_anomaly_score(self, score: float) -> None:
         if not self._check_trigger(score):
             return
@@ -522,59 +478,14 @@ class CameraAnomalyPipeline:
         logger.info(f"⚠️ 이상 감지 트리거 발생 (score={score:.3f})")
         self.hover.hover_now()
 
-        # V6: long-lived upload job에는 reduced snapshot만 보낸다.
-        # live ring과 VadCLIP 입력 해상도는 그대로 유지된다.
-        snapshot = self._make_upload_snapshot()
-        submitted = self._submit_upload(snapshot, score)
-
-        if submitted:
-            logger.info(
-                "영상 전송 job 제출 완료 "
-                f"(frames={len(snapshot)}); VadCLIP inference worker는 계속 동작"
-            )
+        snapshot = self.buffer.get_full_buffer()
+        logger.info("영상 전송 중 (서버 응답 대기, 최대 180초)...")
+        result = upload_clip_sync(snapshot, anomaly_score=score)
+        if result:
+            logger.info(f"서버 응답 수신: {result}")
         else:
-            logger.warning(
-                "이미 clip 업로드가 진행 중이므로 중복 전송 생략; "
-                "VadCLIP inference는 계속 동작"
-            )
-
+            logger.warning("서버 응답 없음/실패")
         logger.info("[Hover] 호버링 유지 중 - 관제사 명령 무한 대기 (command_receiver.py 경유)")
-
-    def _submit_upload(self, snapshot, score: float) -> bool:
-        if self._upload_busy.is_set():
-            return False
-
-        self._upload_busy.set()
-        try:
-            self._upload_queue.put_nowait((snapshot, score))
-            return True
-        except queue.Full:
-            self._upload_busy.clear()
-            return False
-
-    def _upload_loop(self) -> None:
-        logger.info("clip upload worker 시작")
-        while self._running:
-            try:
-                snapshot, score = self._upload_queue.get(timeout=0.5)
-            except queue.Empty:
-                continue
-
-            try:
-                logger.info(
-                    "영상 전송 시작 "
-                    f"(frames={len(snapshot)}, score={score:.3f}, 서버 응답 최대 180초)"
-                )
-                result = upload_clip_sync(snapshot, anomaly_score=score)
-                if result:
-                    logger.info(f"서버 응답 수신: {result}")
-                else:
-                    logger.warning("서버 응답 없음/실패")
-            except Exception:
-                logger.exception("clip upload worker 예외")
-            finally:
-                self._upload_busy.clear()
-                self._upload_queue.task_done()
 
     def _inference_loop(self) -> None:
         logger.info("VadCLIP 추론 worker 시작")
@@ -616,21 +527,8 @@ class CameraAnomalyPipeline:
         if self.cap is None or not self.cap.isOpened():
             self.initialize_camera()
         self._running = True
-
-        self._upload_thread = threading.Thread(
-            target=self._upload_loop,
-            name="clip-upload-worker",
-            daemon=True,
-        )
-        self._upload_thread.start()
-
-        self._inference_thread = threading.Thread(
-            target=self._inference_loop,
-            name="vadclip-inference-worker",
-            daemon=True,
-        )
+        self._inference_thread = threading.Thread(target=self._inference_loop, daemon=True)
         self._inference_thread.start()
-
         frame_interval = 1.0 / FPS
         next_tick = time.time()
 
@@ -697,16 +595,6 @@ class CameraAnomalyPipeline:
 
     def stop(self) -> None:
         self._running = False
-        try:
-            self._stream_uploader.stop()
-        except Exception:
-            logger.exception("StreamUploader stop 중 예외")
-
-        if self._upload_busy.is_set():
-            logger.warning(
-                "종료 시 clip upload가 아직 진행 중입니다. "
-                "upload worker는 daemon이므로 프로세스 종료와 함께 중단될 수 있습니다."
-            )
 
 
 def _signal_handler(pipeline: CameraAnomalyPipeline):

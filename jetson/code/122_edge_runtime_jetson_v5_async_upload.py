@@ -1,4 +1,4 @@
-# TRT V6 MEMORY-SAFE ASYNC-UPLOAD COPY — original main.py/v4/v5 unchanged
+# TRT V5 ASYNC-UPLOAD COPY — original main.py and v4 unchanged
 """
 main.py
 CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 호버링
@@ -29,7 +29,7 @@ import numpy as np
 import requests
 from mavsdk import System
 
-from ring_buffer import RingBuffer, FrameEntry, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
+from ring_buffer import RingBuffer, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
 from uploader import upload_clip_async, upload_clip_sync
 from anomaly_model_trt import AnomalyPipeline
 
@@ -38,11 +38,6 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 logger = logging.getLogger("main_v4_trt")
-
-# V6: live CSI / VadCLIP input resolution is unchanged.
-# Only the anomaly clip queued to the upload worker is reduced.
-UPLOAD_CLIP_WIDTH = int(os.environ.get("UPLOAD_CLIP_WIDTH", "960"))
-UPLOAD_CLIP_HEIGHT = int(os.environ.get("UPLOAD_CLIP_HEIGHT", "540"))
 
 
 # ─── 카메라 설정 ──────────────────────────────────────────────────
@@ -489,32 +484,6 @@ class CameraAnomalyPipeline:
             return True
         return False
 
-    def _make_upload_snapshot(self):
-        full = self.buffer.get_full_buffer()
-        if not full:
-            return []
-
-        t0 = time.time()
-        reduced = []
-        full.reverse()
-        while full:
-            entry = full.pop()
-            frame_small = cv2.resize(
-                entry.frame,
-                (UPLOAD_CLIP_WIDTH, UPLOAD_CLIP_HEIGHT),
-                interpolation=cv2.INTER_AREA,
-            )
-            reduced.append(
-                FrameEntry(frame=frame_small, timestamp=entry.timestamp)
-            )
-
-        elapsed_ms = (time.time() - t0) * 1000.0
-        logger.info(
-            "V6 upload snapshot 준비: frames=%d, resolution=%dx%d, elapsed=%.1fms",
-            len(reduced), UPLOAD_CLIP_WIDTH, UPLOAD_CLIP_HEIGHT, elapsed_ms
-        )
-        return reduced
-
     def _handle_anomaly_score(self, score: float) -> None:
         if not self._check_trigger(score):
             return
@@ -522,9 +491,9 @@ class CameraAnomalyPipeline:
         logger.info(f"⚠️ 이상 감지 트리거 발생 (score={score:.3f})")
         self.hover.hover_now()
 
-        # V6: long-lived upload job에는 reduced snapshot만 보낸다.
-        # live ring과 VadCLIP 입력 해상도는 그대로 유지된다.
-        snapshot = self._make_upload_snapshot()
+        # get_full_buffer()는 FrameEntry들의 list snapshot을 반환한다.
+        # deque가 이후 갱신돼도 이 list가 frame reference를 보유하므로 안전하다.
+        snapshot = self.buffer.get_full_buffer()
         submitted = self._submit_upload(snapshot, score)
 
         if submitted:
