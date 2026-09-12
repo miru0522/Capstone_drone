@@ -334,6 +334,26 @@ class StreamUploader:
         except Exception:
             return None
 
+    def _disable_stream_state(self, reason: str) -> None:
+        """서버가 중지를 지시했을 때 신호파일의 stream_enabled 도 내린다.
+
+        메모리 변수(active)만 내리면 _loop 가 1초 뒤 신호파일을 다시 읽어
+        stream_enabled=true 를 보고 전송을 되살린다. 그 플래그는 STOP_STREAM
+        을 받을 때만 꺼지므로, 410/401 로 멈춰도 1초 뒤 재시작되어 무한히
+        반복된다. 되살아날 때마다 last_response_time 도 초기화되므로
+        10초 무응답 자체중지 안전망까지 무력해진다.
+        """
+        try:
+            import json as _json
+            state = self._read_stream_state() or {}
+            state["stream_enabled"] = False
+            state["disabled_reason"] = reason
+            with open(STREAM_REQUEST_STATE_PATH, "w") as f:
+                _json.dump(state, f)
+            logger.info(f"[StreamUpload] 신호파일 stream_enabled=false 기록 ({reason})")
+        except Exception as e:
+            logger.warning(f"[StreamUpload] 신호파일 중지 기록 실패: {e}")
+
     def _loop(self):
         last_state_check = 0.0
         active = False
@@ -365,6 +385,7 @@ class StreamUploader:
                     f"[StreamUpload] {STREAM_NO_RESPONSE_LIMIT_SEC}초 무응답 - 스스로 중지"
                 )
                 active = False
+                self._disable_stream_state("no_response")
                 continue
 
             frame = self.pipeline_ref.latest_frame_for_stream
@@ -409,9 +430,11 @@ class StreamUploader:
                 elif resp.status_code == 410:
                     logger.info("[StreamUpload] 서버 410 Gone - 즉시 중지")
                     active = False
+                    self._disable_stream_state("410")
                 elif resp.status_code == 401:
                     logger.error("[StreamUpload] 401 Unauthorized (디바이스 키 문제) - 중지")
                     active = False
+                    self._disable_stream_state("401")
                 else:
                     logger.warning(f"[StreamUpload] 예상 밖 응답 {resp.status_code}")
                     last_response_time = time.time()  # 서버가 응답은 했으니 무응답 타이머는 리셋
