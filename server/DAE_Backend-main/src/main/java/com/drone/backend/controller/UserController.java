@@ -97,6 +97,34 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("로그인 처리 중 에러가 발생했습니다.");
         }
     }
+    /**
+     * 로그인 상태 확인 전용. <b>로그인하지 않았어도 200을 돌려준다.</b>
+     *
+     * 예전에는 화면이 /users/me 로 확인했는데, 그건 실제 자원이라 미로그인 시
+     * 403이 나가는 것이 당연하다. 그러면 로그인 화면을 열 때마다 브라우저 콘솔이
+     * 빨개져 진짜 오류를 못 찾는다 (브라우저가 스스로 찍는 줄이라 JS로는 못 지운다).
+     *
+     * "로그인했나?"라는 질문의 답은 거부가 아니라 "아니오"여야 한다.
+     */
+    @GetMapping("/auth/session")
+    public ResponseEntity<Map<String, Object>> getSession(HttpServletRequest request) {
+        Map<String, Object> body = new java.util.HashMap<>();
+        try {
+            String token = jwtUtil.extractTokenFromRequest(request);
+            if (token == null || !jwtUtil.validateToken(token)) {
+                body.put("authenticated", false);
+                return ResponseEntity.ok(body);
+            }
+            body.put("authenticated", true);
+            body.put("user", userService.getUserInfo(jwtUtil.getId(token)));
+        } catch (Exception e) {
+            // 토큰이 깨졌거나 그 사이 계정이 지워졌을 수 있다. 그것도 "로그인 안 됨"이다.
+            body.clear();
+            body.put("authenticated", false);
+        }
+        return ResponseEntity.ok(body);
+    }
+
     //정보 불러오는 api /user/me
     @GetMapping("/users/me")
     public ResponseEntity<UserResponse.Info> getMyInfo(HttpServletRequest request) {

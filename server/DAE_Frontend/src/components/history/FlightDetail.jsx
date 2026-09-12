@@ -1,8 +1,13 @@
-﻿import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from 'react-leaflet';
+import { tileConfig } from '../../config';
+import TileToggle from '../common/TileToggle';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { parseServerTime, fmtClock, fmtDayHeader } from '../../utils/time';
+import { droneColor } from '../../utils/droneColor';
+import { DetailHeader, DroneChip, SectionLabel } from './HistoryParts';
 
-const fmtTime = (t) => new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+const TILE_PREF_KEY = 'dae.mapTile.history';
 
 /**
  * 비행 1회 상세 — 궤적 + 배터리/고도 차트.
@@ -10,16 +15,21 @@ const fmtTime = (t) => new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit'
  * points는 해당 세션 구간만 조회한 결과다(전체 이력이 아니다).
  */
 export default function FlightDetail({ session, points, loading, onBack }) {
+  // 대시보드와 쓰임이 달라(궤적 확인 vs 웨이포인트 지정) 선택을 따로 기억한다.
+  const [useCarto, setUseCarto] = useState(() => {
+    try { return localStorage.getItem(TILE_PREF_KEY) !== 'osm'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(TILE_PREF_KEY, useCarto ? 'carto' : 'osm'); } catch { /* 무시 */ }
+  }, [useCarto]);
+
   const pathPositions = useMemo(
     () => points.filter(d => d.latitude != null && d.longitude != null).map(d => [d.latitude, d.longitude]),
     [points]
   );
 
   const chartData = useMemo(
-    () => points.map(d => ({
-      ...d,
-      timeLabel: new Date(d.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    })),
+    () => points.map(d => ({ ...d, timeLabel: fmtClock(d.timestamp) })),
     [points]
   );
 
@@ -27,45 +37,36 @@ export default function FlightDetail({ session, points, loading, onBack }) {
     ? pathPositions[Math.floor(pathPositions.length / 2)]
     : [36.145, 128.393];
 
-  return (
-    <div className="flex flex-col gap-6 h-full">
-      {/* 헤더 */}
-      <div className="flex items-center gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-        <button
-          onClick={onBack}
-          className="p-2 bg-white border border-gray-300 text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex items-center justify-center"
-          title="목록으로"
-        >
-          <span className="material-symbols-outlined text-[20px]">arrow_back</span>
-        </button>
-        <div>
-          <h3 className="font-bold text-gray-800">
-            {fmtTime(session.startedAt)} ~ {session.inProgress ? '비행 중' : fmtTime(session.endedAt)}
-          </h3>
-          <p className="text-xs text-gray-500">
-            {new Date(session.startedAt).toLocaleDateString('ko-KR')} · {session.pointCount}개 지점
-            {session.distanceM != null && ` · ${(session.distanceM / 1000).toFixed(2)}km`}
-          </p>
-        </div>
-        {loading && <span className="ml-auto text-sm text-gray-400">불러오는 중...</span>}
-      </div>
+  const start = parseServerTime(session.startedAt);
+  const mins = Math.max(1, Math.round((parseServerTime(session.endedAt) - start) / 60000));
+  const meta = [
+    `${fmtDayHeader(start)} ${fmtClock(session.startedAt)} ~ ${session.inProgress ? '비행 중' : fmtClock(session.endedAt)}`,
+    `${mins}분`,
+    session.distanceM != null ? `${(session.distanceM / 1000).toFixed(2)}km` : null,
+    session.maxAltM != null ? `최고 ${session.maxAltM.toFixed(0)}m` : null,
+    `${session.pointCount.toLocaleString()}개 지점`,
+  ].filter(Boolean).join(' · ');
 
-      <div className="grid grid-cols-2 gap-6 flex-1 h-[500px]">
-        {/* 궤적 */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col h-full">
-          <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-green-600">route</span>
-            Flight Trajectory
-          </h3>
-          <div className="flex-1 rounded-lg overflow-hidden border border-gray-200 relative z-0">
+  return (
+    <div className="flex flex-col gap-4 h-full">
+      <DetailHeader
+        onBack={onBack}
+        title={<>비행 기록 <DroneChip id={session.droneId} /></>}
+        meta={meta}
+        right={loading && <span className="text-xs text-[#727785]">불러오는 중…</span>}
+      />
+
+      <div className="grid grid-cols-2 gap-4 flex-1 min-h-[460px]">
+        {/* 궤적 — 지도와 같은 드론 색으로 그린다 */}
+        <div className="bg-white rounded-xl border border-[#c2c6d6]/70 shadow-sm p-4 flex flex-col">
+          <SectionLabel icon="route">Flight Trajectory</SectionLabel>
+          <div className="flex-1 rounded-lg overflow-hidden border border-[#c2c6d6]/70 relative z-0">
             {pathPositions.length > 0 ? (
+              <>
               <MapContainer center={mapCenter} zoom={16} scrollWheelZoom={true} style={{ width: '100%', height: '100%' }}>
-                <TileLayer
-                  attribution='&copy; OpenStreetMap'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
+                <TileLayer key={useCarto ? 'carto' : 'osm'} {...tileConfig(useCarto)} />
                 {pathPositions.length > 1 && (
-                  <Polyline positions={pathPositions} color="blue" weight={4} opacity={0.7} />
+                  <Polyline positions={pathPositions} color={droneColor(session.droneId)} weight={4} opacity={0.8} />
                 )}
                 <Marker position={pathPositions[0]}>
                   <Popup>Start Point</Popup>
@@ -76,21 +77,23 @@ export default function FlightDetail({ session, points, loading, onBack }) {
                   </Marker>
                 )}
               </MapContainer>
+              {/* 확대 컨트롤 바로 아래. MapContainer 밖에 두어 Leaflet 이벤트와 겹치지 않게 한다. */}
+              <div className="absolute top-[82px] left-[10px] z-[1000]">
+                <TileToggle useCarto={useCarto} onToggle={() => setUseCarto((v) => !v)} size="w-8 h-8" />
+              </div>
+              </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-50 text-gray-400 text-sm">
-                표시할 위치 데이터가 없습니다.
+              <div className="w-full h-full flex items-center justify-center bg-[#f8f9ff] text-[#727785] text-sm">
+                {loading ? '불러오는 중…' : '표시할 위치 데이터가 없습니다.'}
               </div>
             )}
           </div>
         </div>
 
         {/* 배터리 / 고도 */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col h-full">
-          <h3 className="font-semibold text-gray-700 mb-4 flex items-center gap-2">
-            <span className="material-symbols-outlined text-orange-500">monitoring</span>
-            Battery &amp; Altitude
-          </h3>
-          <div className="flex-1 bg-gray-50 rounded-lg border border-gray-200 p-4">
+        <div className="bg-white rounded-xl border border-[#c2c6d6]/70 shadow-sm p-4 flex flex-col">
+          <SectionLabel icon="monitoring">Battery &amp; Altitude</SectionLabel>
+          <div className="flex-1 bg-[#f8f9ff] rounded-lg border border-[#c2c6d6]/70 p-4">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
@@ -108,8 +111,8 @@ export default function FlightDetail({ session, points, loading, onBack }) {
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400 text-sm">
-                표시할 데이터가 없습니다.
+              <div className="w-full h-full flex items-center justify-center text-[#727785] text-sm">
+                {loading ? '불러오는 중…' : '표시할 데이터가 없습니다.'}
               </div>
             )}
           </div>
@@ -118,4 +121,3 @@ export default function FlightDetail({ session, points, loading, onBack }) {
     </div>
   );
 }
-

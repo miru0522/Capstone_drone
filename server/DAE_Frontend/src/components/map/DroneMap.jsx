@@ -1,8 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents, Polyline } from 'react-leaflet';
+import { tileConfig } from '../../config';
+import TileToggle from '../common/TileToggle';
 import L from 'leaflet';
 import useDroneStore from '../../store/useDroneStore';
 import { saveRoute, saveStation, saveWaypoints } from '../../services/api';
+import { droneColor } from '../../utils/droneColor';
 
 // Leaflet 기본 아이콘 경로 문제 해결
 delete L.Icon.Default.prototype._getIconUrl;
@@ -12,23 +16,34 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-const droneIcon = new L.DivIcon({
-  html: `<div style="width: 24px; height: 24px; background: rgba(0, 88, 190, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0, 88, 190, 0.5);">
-          <div style="width: 10px; height: 10px; background: #0058be; border-radius: 50%;"></div>
+// 드론 마커와 그 드론의 스테이션을 같은 색으로 묶는다. 색은 utils/droneColor — 기록 화면도 같은 색을 쓴다.
+
+/** 색을 rgba로 — 오프라인 표현에 투명도가 필요하다. */
+const rgba = (hex, a) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+};
+
+// 드론 본체 마커. 오프라인은 회색으로 바꾸지 않고 자기 색을 흐리게 한다 —
+// 회색으로 만들면 스테이션과의 색 짝이 끊겨 누구 것인지 다시 알 수 없어진다.
+const droneIcon = (color, offline) => new L.DivIcon({
+  html: `<div style="width: 24px; height: 24px; background: ${rgba(color, offline ? 0.12 : 0.2)}; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px ${rgba(color, offline ? 0.25 : 0.5)}; opacity: ${offline ? 0.55 : 1};">
+          <div style="width: 10px; height: 10px; background: ${color}; border-radius: 50%;"></div>
          </div>`,
   className: '',
   iconSize: [24, 24],
   iconAnchor: [12, 12],
 });
 
-// 오프라인 드론 커스텀 마커 아이콘 (회색)
-const offlineDroneIcon = new L.DivIcon({
-  html: `<div style="width: 24px; height: 24px; background: rgba(156, 163, 175, 0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(156, 163, 175, 0.5);">
-          <div style="width: 10px; height: 10px; background: #6b7280; border-radius: 50%;"></div>
+// 스테이션 마커. 꺼진 드론의 스테이션은 점선 테두리에 반투명으로 그려
+// "지금 쓰이지 않는 자리"임을 한눈에 보이게 한다.
+const stationIcon = (color, offline) => new L.DivIcon({
+  html: `<div style="width: 32px; height: 32px; background: ${offline ? rgba(color, 0.45) : color}; border: 2px ${offline ? 'dashed ' + color : 'solid white'}; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,${offline ? 0.15 : 0.3}); opacity: ${offline ? 0.55 : 1};">
+          <span class="material-symbols-outlined" style="color: white; font-size: 20px;">home</span>
          </div>`,
   className: '',
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
 });
 
 // 커스텀 웨이포인트 마커 아이콘 — 순서를 알아야 편집이 되므로 번호를 박는다
@@ -37,16 +52,6 @@ const waypointIcon = (step) => new L.DivIcon({
   className: '',
   iconSize: [20, 20],
   iconAnchor: [10, 10],
-});
-
-// 커스텀 스테이션 마커 아이콘 (주황색 바탕 집 모양)
-const stationIcon = new L.DivIcon({
-  html: `<div style="width: 32px; height: 32px; background: #f97316; border: 2px solid white; border-radius: 8px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
-          <span class="material-symbols-outlined" style="color: white; font-size: 20px;">home</span>
-         </div>`,
-  className: '',
-  iconSize: [32, 32],
-  iconAnchor: [16, 16],
 });
 
 // 커스텀 임시 스테이션 마커 아이콘 (반투명 점멸)
@@ -59,9 +64,67 @@ const tempStationIcon = new L.DivIcon({
   iconAnchor: [16, 16],
 });
 
+
+/**
+ * 드론 한 대의 마커(본체 + 스테이션).
+ *
+ * 별도 컴포넌트로 두는 이유는 아이콘을 useMemo로 캐시하기 위해서다.
+ * 아이콘이 함수가 되면서 렌더마다 새 L.DivIcon이 만들어지는데,
+ * 텔레메트리가 1초마다 오므로 그대로 두면 매초 마커가 다시 그려진다.
+ */
+function DroneMarkers({ drone }) {
+  const icons = React.useMemo(() => {
+    const offline = drone.status === 'OFFLINE' || !drone.status;
+    const color = droneColor(drone.id);
+    return { color, offline, drone: droneIcon(color, offline), station: stationIcon(color, offline) };
+  }, [drone.id, drone.status]);
+
+  return (
+    <>
+
+            {/* 드론 본체 마커 — 위치를 한 번도 받지 못한 드론(등록만 된 상태)은 그리지 않는다 */}
+            {typeof drone.lat === 'number' && typeof drone.lng === 'number' && (
+              <Marker position={[drone.lat, drone.lng]} icon={icons.drone}>
+                <Popup>
+                  <div className="text-center font-sans">
+                    <p className="font-bold text-sm mb-1">{drone.id}</p>
+                    <p className="text-xs text-gray-600">Alt: {drone.altitude}m</p>
+                    <p className="text-xs text-gray-600">Bat: {drone.battery}%</p>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+            
+            {/* 스테이션은 고정 지형지물이고 드론은 움직이는 관제 대상이다.
+                겹칠 때 드론이 가려지면 위치를 놓치므로 스테이션을 뒤로 깐다. */}
+            {drone.station && drone.station.lat && drone.station.lng && (
+              <Marker position={[drone.station.lat, drone.station.lng]} icon={icons.station} zIndexOffset={-1000}>
+                <Popup>
+                  <div className="text-center font-sans">
+                    <p className="font-bold text-sm mb-1" style={{ color: icons.color }}>{drone.id} Station</p>
+                    <p className="text-[10px] text-gray-500">{icons.offline ? '드론 오프라인' : 'Home Base'}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            )}
+    </>
+  );
+}
+
 // GPS 이동 컨트롤 컴포넌트 (Map 안에서 map 객체를 얻기 위해 분리)
-function GpsControl({ drones, selectedDroneId }) {
+function GpsControl({ drones, selectedDroneId, useCarto, onToggleTile }) {
   const map = useMap();
+  const controlRef = useRef(null);
+
+  // 이 버튼들은 MapContainer 안에 있어서, 네이티브 클릭이 지도까지 올라간다.
+  // 두 번 누르면 지도가 확대되고, 휠을 굴리면 지도가 확대·축소된다.
+  // React의 stopPropagation으로는 못 막는다 — Leaflet이 지도 div에 네이티브
+  // 리스너를 직접 붙여 React 루트보다 먼저 받기 때문이다.
+  useEffect(() => {
+    if (!controlRef.current) return;
+    L.DomEvent.disableClickPropagation(controlRef.current);
+    L.DomEvent.disableScrollPropagation(controlRef.current);
+  }, []);
   const isCameraTracking = useDroneStore(state => state.isCameraTracking);
   const setIsCameraTracking = useDroneStore(state => state.setIsCameraTracking);
 
@@ -87,7 +150,8 @@ function GpsControl({ drones, selectedDroneId }) {
     : "w-12 h-12 flex items-center justify-center bg-white rounded-full shadow-md border border-gray-300 hover:bg-gray-50 text-gray-600 transition-colors";
 
   return (
-    <div className="absolute bottom-6 left-6 flex flex-col gap-2 z-[400]">
+    <div ref={controlRef} className="absolute bottom-6 left-6 flex flex-col gap-2 z-[400]">
+      <TileToggle useCarto={useCarto} onToggle={onToggleTile} />
       <button
         onClick={handleClick}
         className={btnStyle}
@@ -183,7 +247,18 @@ const previewIcon = (step) => new L.DivIcon({
   iconAnchor: [10, 10],
 });
 
+const TILE_PREF_KEY = 'dae.mapTile';
+
 export default function DroneMap() {
+  // 관제사가 고른 지도를 기억한다. 새로고침마다 되돌아가면 매번 다시 눌러야 한다.
+  // 저장소 접근이 막힌 환경(사생활 보호 모드 등)에서도 화면이 떠야 하므로 감싼다.
+  const [useCarto, setUseCarto] = useState(() => {
+    try { return localStorage.getItem(TILE_PREF_KEY) !== 'osm'; } catch { return true; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(TILE_PREF_KEY, useCarto ? 'carto' : 'osm'); } catch { /* 무시 */ }
+  }, [useCarto]);
+
   const drones = useDroneStore((state) => state.drones);
   const selectedDroneId = useDroneStore((state) => state.selectedDroneId);
   const isDrawingRoute = useDroneStore((state) => state.isDrawingRoute);
@@ -203,27 +278,27 @@ export default function DroneMap() {
 
   const handleSaveRoute = async () => {
     if (routePoints.length < 2) {
-      alert("최소 2개 이상의 웨이포인트를 지정해주세요.");
+      toast.error("최소 2개 이상의 웨이포인트를 지정해주세요.");
       return;
     }
     try {
       if (drawingRoute) {
         // 저장된 순찰 경로(Route) 편집 — 드론에는 보내지 않고 DB에만 반영한다.
         await saveWaypoints(drawingRoute.routeId, routePoints);
-        alert(`'${drawingRoute.routeName}' 경로가 저장되었습니다.`);
+        toast.success(`'${drawingRoute.routeName}' 경로가 저장되었습니다.`);
       } else {
         await saveRoute(drawingTargetDroneId, routePoints);
-        alert("경로가 전송되었습니다. 순찰시작을 누르세요.");
+        toast.success("경로가 전송되었습니다. 순찰 시작을 누르세요.");
       }
       stopDrawingRoute();
     } catch (e) {
-      alert(drawingRoute ? "경로 저장 실패" : "경로 전송 실패");
+      toast.error(drawingRoute ? "경로 저장 실패" : "경로 전송 실패");
     }
   };
 
   const handleSaveStation = async () => {
     if (!tempStationCoords) {
-      alert("지도에 클릭하여 스테이션 위치를 지정해주세요.");
+      toast("지도를 클릭해 스테이션 위치를 지정해 주세요.");
       return;
     }
     try {
@@ -235,10 +310,10 @@ export default function DroneMap() {
         station: { lat: tempStationCoords.lat, lng: tempStationCoords.lng }
       });
       
-      alert("스테이션(기지) 위치가 갱신되었습니다.");
+      toast.success("스테이션(기지) 위치가 갱신되었습니다.");
       stopSettingStation();
     } catch (e) {
-      alert("스테이션 전송 실패");
+      toast.error("스테이션 전송 실패");
     }
   };
 
@@ -251,9 +326,11 @@ export default function DroneMap() {
         style={{ height: '100%', width: '100%', cursor: isDrawingRoute ? 'crosshair' : 'grab' }}
         zoomControl={false}
       >
+        {/* key를 주어 전환 시 레이어를 새로 만든다 —
+            url만 갈아끼우면 subdomains·maxZoom이 옛 값으로 남는다. */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          key={useCarto ? 'carto' : 'osm'}
+          {...tileConfig(useCarto)}
           maxNativeZoom={19}
           maxZoom={24}
         />
@@ -262,33 +339,7 @@ export default function DroneMap() {
         
         {/* 드론 마커 & 스테이션 마커 */}
         {drones.map(drone => (
-          <React.Fragment key={drone.id}>
-            {/* 드론 본체 마커 — 위치를 한 번도 받지 못한 드론(등록만 된 상태)은 그리지 않는다 */}
-            {typeof drone.lat === 'number' && typeof drone.lng === 'number' && (
-              <Marker position={[drone.lat, drone.lng]} icon={drone.status === 'OFFLINE' ? offlineDroneIcon : droneIcon}>
-                <Popup>
-                  <div className="text-center font-sans">
-                    <p className="font-bold text-sm mb-1">{drone.id}</p>
-                    <p className="text-xs text-gray-600">Alt: {drone.altitude}m</p>
-                    <p className="text-xs text-gray-600">Bat: {drone.battery}%</p>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-            
-            {/* 스테이션은 고정 지형지물이고 드론은 움직이는 관제 대상이다.
-                겹칠 때 드론이 가려지면 위치를 놓치므로 스테이션을 뒤로 깐다. */}
-            {drone.station && drone.station.lat && drone.station.lng && (
-              <Marker position={[drone.station.lat, drone.station.lng]} icon={stationIcon} zIndexOffset={-1000}>
-                <Popup>
-                  <div className="text-center font-sans">
-                    <p className="font-bold text-sm text-orange-600 mb-1">{drone.id} Station</p>
-                    <p className="text-[10px] text-gray-500">Home Base</p>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-          </React.Fragment>
+          <DroneMarkers key={drone.id} drone={drone} />
         ))}
 
         {/* 순찰 시작 팝업의 경로 미리보기.
@@ -329,7 +380,8 @@ export default function DroneMap() {
         )}
 
         {/* GPS UI 오버레이 (Map 객체 제어를 위해 MapContainer 안으로 이동) */}
-        <GpsControl drones={drones} selectedDroneId={selectedDroneId} />
+        <GpsControl drones={drones} selectedDroneId={selectedDroneId}
+                    useCarto={useCarto} onToggleTile={() => setUseCarto((v) => !v)} />
       </MapContainer>
 
       {/* 경로 그리기 오버레이 UI */}
@@ -397,7 +449,7 @@ export default function DroneMap() {
               if (targetDrone && targetDrone.lat && targetDrone.lng) {
                 useDroneStore.getState().setTempStationCoords({ lat: targetDrone.lat, lng: targetDrone.lng });
               } else {
-                alert("드론의 현재 위치를 알 수 없습니다.");
+                toast.error("드론의 현재 위치를 알 수 없습니다.");
               }
             }}
             className="text-sm font-bold text-blue-600 hover:text-blue-800 px-2 flex items-center gap-1"

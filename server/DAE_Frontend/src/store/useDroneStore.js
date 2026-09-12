@@ -231,6 +231,19 @@ const useDroneStore = create((set) => ({
   closeTTSModal: () => set({ ttsModal: { isOpen: false, alertId: null } }),
   // 임무를 마치고 공중 대기 중인 드론에 다음 지시를 묻는 팝업.
   // 드론이 스스로 내려앉지 않으므로, 관제사가 착륙을 지시할 통로가 필요하다.
+  /**
+   * 드론별 마지막 조작. { [droneId]: { operator, action, at } }
+   *
+   * 관제사가 둘 이상 붙으면 점유 개념이 없어 같은 드론에 서로 명령할 수 있다.
+   * 막지는 않되(잠금은 남았을 때 아무도 못 만지게 된다) 누가 무엇을 지시했는지
+   * 보이게 한다. 오래된 항목은 화면에서 시간으로 걸러낸다 — 텔레메트리가
+   * 1초마다 오면서 다시 그려지므로 별도 타이머가 필요 없다.
+   */
+  droneOperations: {},
+  noteDroneOperation: (op) => set((state) => ({
+    droneOperations: { ...state.droneOperations, [op.droneId]: op },
+  })),
+
   // 실시간 영상. 한 번에 한 대만 본다 — 서버도 한 대만 중계한다.
   liveStreamModal: { isOpen: false, droneId: null },
   openLiveStream: (droneId) => set({ liveStreamModal: { isOpen: true, droneId } }),
@@ -245,6 +258,11 @@ const useDroneStore = create((set) => ({
   closeCancelModal: () => set({ cancelModal: { isOpen: false, droneId: null } }),
   toggleAlertPanel: () => set((state) => ({ isAlertPanelOpen: !state.isAlertPanelOpen })),
   setAlertPanelOpen: (isOpen) => set({ isAlertPanelOpen: isOpen }),
+  // 좁은 화면(md 미만)에서 사이드바를 서랍으로 여닫는다.
+  // md 이상에서는 항상 고정 표시되므로 이 값과 무관하다.
+  isSidebarOpen: false,
+  setSidebarOpen: (open) => set({ isSidebarOpen: open }),
+
   setDroneManagementOpen: (isOpen) => set({ isDroneManagementOpen: isOpen }),
   setDroneSettings: (settings) => set({ droneSettings: settings }),
   setRouteManagerOpen: (isOpen) => set({ isRouteManagerOpen: isOpen }),

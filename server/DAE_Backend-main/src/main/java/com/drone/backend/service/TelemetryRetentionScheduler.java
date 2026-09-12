@@ -22,7 +22,8 @@ public class TelemetryRetentionScheduler {
     @Value("${app.telemetry.retention.days:90}")
     private int retentionDays;
 
-    @Scheduled(cron = "0 0 3 * * ?") // 매일 새벽 3시
+    // 한국 새벽 3시. zone 이 없으면 서버 시간대(UTC)를 따라 한국 정오에 돌았다.
+    @Scheduled(cron = "0 0 3 * * ?", zone = "Asia/Seoul")
     @Transactional
     public void deleteOldTelemetryData() {
         log.info("🧹 텔레메트리 보존 주기({}일)에 따른 과거 데이터 정리 스케줄러 실행", retentionDays);

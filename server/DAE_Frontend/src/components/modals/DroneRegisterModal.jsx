@@ -64,7 +64,9 @@ export default function DroneRegisterModal() {
       closeRegisterModal();
     } catch (err) {
       console.error(err);
-      setError("등록에 실패했습니다. 서버를 확인해주세요.");
+      // 드론 등록은 ADMIN 전용이다. 권한 문제를 "서버를 확인해주세요"로
+      // 알리면 관제사가 없는 장애를 찾게 된다.
+      setError(err.userMessage ?? "등록에 실패했습니다. 서버를 확인해주세요.");
     } finally {
       setIsLoading(false);
     }

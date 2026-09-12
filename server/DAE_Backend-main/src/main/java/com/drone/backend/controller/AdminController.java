@@ -34,7 +34,8 @@ public class AdminController {
         
         List<UserResponse.Info> dtos = users.stream()
             .map(u -> new UserResponse.Info(u.getId(), u.getUserId(), u.getName(), u.getEmail(),
-                    u.getRole().name(), u.getStatus().name(), u.getProfileImage()))
+                    u.getRole().name(), u.getStatus().name(), u.getProfileImage(),
+                    u.getCreatedAt(), u.getRejectReason()))
             .collect(Collectors.toList());
             
         return ResponseEntity.ok(dtos);
@@ -45,29 +46,57 @@ public class AdminController {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
         user.setStatus(Status.APPROVED);
+        // 거절했다가 다시 승인하는 경우가 있다. 옛 사유가 남아 있으면
+        // 나중에 다시 거절할 때 그 문구가 되살아난다.
+        user.setRejectReason(null);
         userRepository.save(user);
         log.info("관리자가 사용자({}) 가입을 승인했습니다.", user.getUserId());
         return ResponseEntity.ok("승인 완료");
     }
 
+    /**
+     * 가입 반려. 사유는 선택이며, 본인이 로그인을 시도하면 그 문구를 보여준다.
+     *
+     * 본문이 없어도 동작해야 한다 - 옛 화면이나 curl 에서 사유 없이 부를 수 있다.
+     */
     @PostMapping("/{id}/reject")
-    public ResponseEntity<String> rejectUser(@PathVariable Long id) {
+    public ResponseEntity<String> rejectUser(
+            @PathVariable Long id,
+            @RequestBody(required = false) com.drone.backend.dto.UserRequest.Reject payload) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
         user.setStatus(Status.REJECTED);
+
+        String reason = payload == null ? null : payload.getReason();
+        user.setRejectReason(reason == null || reason.isBlank() ? null : reason.trim());
+
         userRepository.save(user);
-        log.info("관리자가 사용자({}) 가입을 거절했습니다.", user.getUserId());
+        log.info("관리자가 사용자({}) 가입을 반려했습니다. 사유={}", user.getUserId(),
+                user.getRejectReason() == null ? "(없음)" : user.getRejectReason());
         return ResponseEntity.ok("거절 완료");
     }
 
+    /**
+     * 보관함으로 옮긴다. 지우는 것이 아니라 되돌릴 수 있다.
+     *
+     * 멀쩡히 쓰던 계정을 내리는 것이므로 사유를 남긴다 - 없으면 나중에 왜
+     * 내렸는지 아무도 모른다. 반려와 같은 컬럼(reject_reason)을 쓴다.
+     */
     @PostMapping("/{id}/disable")
-    public ResponseEntity<String> disableUser(@PathVariable Long id) {
+    public ResponseEntity<String> disableUser(
+            @PathVariable Long id,
+            @RequestBody(required = false) com.drone.backend.dto.UserRequest.Reject payload) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
         user.setStatus(Status.DISABLED);
+
+        String reason = payload == null ? null : payload.getReason();
+        user.setRejectReason(reason == null || reason.isBlank() ? null : reason.trim());
+
         userRepository.save(user);
-        log.info("관리자가 사용자({})를 비활성화했습니다.", user.getUserId());
-        return ResponseEntity.ok("비활성화 완료");
+        log.info("관리자가 사용자({})를 보관 처리했습니다. 사유={}", user.getUserId(),
+                user.getRejectReason() == null ? "(없음)" : user.getRejectReason());
+        return ResponseEntity.ok("보관 완료");
     }
 
     @PatchMapping("/{id}/role")

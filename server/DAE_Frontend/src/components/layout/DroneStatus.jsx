@@ -4,7 +4,7 @@ import useUserStore from '../../store/useUserStore';
 import { pausePatrol, cancelPatrol, landPatrol, returnToBase, saveStation, resumePatrol } from '../../services/api';
 import api from '../../services/api';
 import ControlButton from '../common/ControlButton';
-import { statusStyle, isAirborne, isBatteryRtl } from '../../utils/droneStatus';
+import { statusStyle, isAirborne, isBatteryRtl, COMMAND_LABEL, OPERATING_WINDOW_MS } from '../../utils/droneStatus';
 import toast from 'react-hot-toast';
 
 export default function DroneStatus() {
@@ -17,6 +17,8 @@ export default function DroneStatus() {
   const canOperate = role === 'ADMIN' || role === 'OPERATOR';
   const openCancelModal = useDroneStore((state) => state.openCancelModal);
   const openLiveStream = useDroneStore((state) => state.openLiveStream);
+  const droneOperations = useDroneStore((state) => state.droneOperations);
+  const myName = useUserStore((state) => state.userInfo?.name);
   const openStartPatrolModal = useDroneStore((state) => state.openStartPatrolModal);
   const droneSettings = useDroneStore((state) => state.droneSettings);
 
@@ -274,6 +276,26 @@ export default function DroneStatus() {
                         </div>
                       )}
 
+                      {/* 다른 관제사가 방금 이 드론을 만졌다면 알린다.
+                          막지는 않는다 - 급한 상황에서 누구든 기체를 세울 수
+                          있어야 한다. 다만 모르고 덮어쓰는 일은 없어야 한다. */}
+                      {(() => {
+                        const op = droneOperations[drone.id];
+                        if (!op || op.operator === myName) return null;
+                        if (Date.now() - op.at > OPERATING_WINDOW_MS) return null;
+                        return (
+                          <div className="col-span-2 flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-amber-50 border border-amber-200">
+                            <span className="material-symbols-outlined text-[16px] text-amber-600">person_alert</span>
+                            <span className="text-[11px] font-bold text-amber-800">
+                              {op.operator} 조작 중
+                            </span>
+                            <span className="text-[11px] text-amber-700">
+                              · {COMMAND_LABEL[op.action] ?? op.action}
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                       {/* 실시간 영상 — 지상에서도 카메라를 볼 수 있어야 하므로
                           공중 여부와 무관하게 연결만 되어 있으면 띄운다. */}
                       {!offline && (
@@ -306,7 +328,7 @@ export default function DroneStatus() {
           onClick={() => setIsRegisteredExpanded(!isRegisteredExpanded)}
         >
           <h3 className="text-xs font-medium text-[#727785] uppercase tracking-widest flex items-center gap-1">
-            Registered DB <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded-full text-gray-600">{registeredDrones.length}</span>
+            Registered <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded-full text-gray-600">{registeredDrones.length}</span>
           </h3>
           <span
             className={`material-symbols-outlined text-gray-400 text-[18px] transition-transform duration-300 ease-out ${

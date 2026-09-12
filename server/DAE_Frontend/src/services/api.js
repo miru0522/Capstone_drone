@@ -7,6 +7,34 @@ const api = axios.create({
   withCredentials: true,
 });
 
+/**
+ * 실패 응답에 사람이 읽을 문구를 붙인다.
+ *
+ * 각 화면이 저마다 "서버를 확인해주세요" 같은 문구를 쓰고 있어, 권한이 없어
+ * 403이 나도 관제사가 시스템 장애로 오해했다. 원인별 문구를 한 곳에서 정한다.
+ *
+ * 오류를 삼키지 않는다 — 그대로 다시 던지고, 화면은 error.userMessage 를
+ * 쓰면 된다. 없으면 기존 문구가 그대로 쓰인다.
+ */
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error.response?.status;
+    if (status === 403) {
+      error.userMessage = '권한이 없습니다. 관리자에게 문의하세요.';
+    } else if (status === 401) {
+      error.userMessage = '로그인이 필요합니다. 다시 로그인해 주세요.';
+    } else if (status === 404) {
+      error.userMessage = '대상을 찾을 수 없습니다.';
+    } else if (status >= 500) {
+      error.userMessage = '서버에서 오류가 발생했습니다.';
+    } else if (!error.response) {
+      error.userMessage = '서버에 연결할 수 없습니다. 네트워크를 확인해 주세요.';
+    }
+    return Promise.reject(error);
+  }
+);
+
 
 
 export const login = async (id, pwd) => {
@@ -40,12 +68,21 @@ export const getMyDrones = async () => {
   }
 };
 
+// 로그인 상태 확인.
+// /users/me 는 실제 자원이라 미로그인 시 403이 나가고, 그러면 로그인 화면을 열 때마다
+// 브라우저 콘솔에 빨간 줄이 남는다(브라우저가 스스로 찍는 것이라 JS로는 못 지운다).
+// /auth/session 은 로그인하지 않았어도 200으로 "아니오"를 돌려준다.
 export const checkAuth = async () => {
   try {
-    const res = await api.get('/users/me');
-    return res.data;
+    const res = await api.get('/auth/session');
+    if (!res.data?.authenticated) {
+      // 정상 응답이지만 로그인은 아니다. App이 이 예외로 로그인 화면을 띄운다.
+      throw new Error('NOT_AUTHENTICATED');
+    }
+    return res.data.user;
   } catch (error) {
-    console.error("Check Auth Error:", error);
+    // 미로그인은 오류가 아니므로 조용히 넘긴다. 서버가 죽은 경우 등만 기록한다.
+    if (error.message !== 'NOT_AUTHENTICATED') console.error("Check Auth Error:", error);
     throw error;
   }
 };
@@ -115,6 +152,20 @@ export const pausePatrol = async (droneId) => {
     console.error("Pause Patrol Error:", error);
     throw error;
   }
+};
+
+/**
+ * 조작 이력. 조회 전용이라 VIEWER 도 부를 수 있다.
+ * droneIds·from·to 는 선택 - 비우면 전체를 본다. from/to 는 utils/time 의 UTC 형식.
+ * 드론 여러 대는 ?droneId=A&droneId=B 로 보낸다 — axios 는 배열을 droneId[]= 로 보내 서버가 못 받는다.
+ */
+export const getCommandLogs = async ({ droneIds = [], from, to } = {}) => {
+  const params = new URLSearchParams();
+  droneIds.forEach((id) => params.append('droneId', id));
+  if (from) params.append('from', from);
+  if (to) params.append('to', to);
+  const res = await api.get('/command-logs', { params });
+  return res.data;
 };
 
 // ── 실시간 영상 (2026-08-22 드론팀 합의) ─────────────────────────
@@ -304,9 +355,10 @@ export const approveUser = async (id) => {
   }
 };
 
-export const rejectUser = async (id) => {
+// 사유는 선택이다. 비워 두면 서버가 사유 없이 거절만 기록한다.
+export const rejectUser = async (id, reason) => {
   try {
-    const res = await api.post(`/admin/users/${id}/reject`);
+    const res = await api.post(`/admin/users/${id}/reject`, { reason: reason ?? null });
     return res.data;
   } catch (error) {
     console.error("Reject User Error:", error);
@@ -314,9 +366,10 @@ export const rejectUser = async (id) => {
   }
 };
 
-export const disableUser = async (id) => {
+// 사유는 선택이다. 반려와 같은 컬럼에 저장된다.
+export const disableUser = async (id, reason) => {
   try {
-    const res = await api.post(`/admin/users/${id}/disable`);
+    const res = await api.post(`/admin/users/${id}/disable`, { reason: reason ?? null });
     return res.data;
   } catch (error) {
     console.error("Disable User Error:", error);
@@ -340,16 +393,6 @@ export const deleteUserByAdmin = async (id) => {
     return res.data;
   } catch (error) {
     console.error("Delete User Error:", error);
-    throw error;
-  }
-};
-
-export const changeUserPasswordByAdmin = async (id, pwd) => {
-  try {
-    const res = await api.patch(`/admin/users/${id}/password`, { pwd });
-    return res.data;
-  } catch (error) {
-    console.error("Change Password Error:", error);
     throw error;
   }
 };

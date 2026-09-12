@@ -1,5 +1,7 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import useDroneStore from '../../store/useDroneStore';
+import useUserStore from '../../store/useUserStore';
 import { landPatrol, returnToBase } from '../../services/api';
 
 /**
@@ -14,6 +16,10 @@ export default function MissionDoneModal() {
   const { isOpen, droneId, kind, alertId } = useDroneStore((state) => state.missionDoneModal);
   const closeMissionDoneModal = useDroneStore((state) => state.closeMissionDoneModal);
   const resolveAlert = useDroneStore((state) => state.resolveAlert);
+  // 착륙·복귀는 관제 조작이다. VIEWER는 서버가 403으로 막으므로
+  // 누를 수 있는 버튼을 보여줄 이유가 없다 (DroneStatus와 같은 기준).
+  const role = useUserStore((state) => state.userInfo?.role);
+  const canOperate = role === 'ADMIN' || role === 'OPERATOR';
 
   if (!isOpen) return null;
 
@@ -27,7 +33,7 @@ export default function MissionDoneModal() {
       closeMissionDoneModal();
     } catch (e) {
       console.error(e);
-      alert(failMsg);
+      toast.error(e.userMessage ?? failMsg);
     }
   };
 
@@ -71,7 +77,10 @@ export default function MissionDoneModal() {
         </p>
 
         <div className="flex gap-3 justify-end">
-          {isPatrol && (
+          {!canOperate && (
+            <p className="text-[11px] text-gray-400 py-2">조회 권한으로는 지시할 수 없습니다.</p>
+          )}
+          {canOperate && isPatrol && (
             <button
               onClick={() => run(returnToBase, '복귀 명령에 실패했습니다.')}
               className="px-4 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
@@ -79,12 +88,14 @@ export default function MissionDoneModal() {
               스테이션 복귀
             </button>
           )}
-          <button
-            onClick={() => run(landPatrol, '착륙 명령에 실패했습니다.')}
-            className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
-          >
-            안전 착륙
-          </button>
+          {canOperate && (
+            <button
+              onClick={() => run(landPatrol, '착륙 명령에 실패했습니다.')}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors"
+            >
+              안전 착륙
+            </button>
+          )}
         </div>
       </div>
     </div>

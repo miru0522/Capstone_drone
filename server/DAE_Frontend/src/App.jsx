@@ -25,6 +25,7 @@ import useDroneStore from './store/useDroneStore';
 import useUserStore from './store/useUserStore';
 import AccountManagementModal from './components/modals/AccountManagementModal';
 import HistoryPanel from './components/layout/HistoryPanel';
+import { parseServerTime } from './utils/time';
 
 // 텔레메트리가 이 시간 이상 끊기면 OFFLINE으로 간주한다 (드론은 1초 주기로 발행)
 const TELEMETRY_TIMEOUT_MS = 10000;
@@ -53,9 +54,7 @@ function App() {
   }, []);
 
   const handleLoginSuccess = async () => {
-    console.log("=== [DEBUG] handleLoginSuccess 호출됨! 내 정보 다시 갱신 시작 ===");
     await verifyAuth(); // 로그인 직후 내 정보 다시 땡겨오기
-    console.log("=== [DEBUG] 내 정보 갱신 완료! ===");
   };
 
   // 앱 실행 시 WebSocket 연결 (로그인 후에만)
@@ -90,7 +89,7 @@ function App() {
           .forEach((e) => useDroneStore.getState().addAlert({
             id: e.eventId,
             type: 'Critical',
-            time: e.timestamp ? new Date(e.timestamp).toLocaleTimeString('ko-KR', { hour12: false }) : '',
+            time: e.timestamp ? parseServerTime(e.timestamp).toLocaleTimeString('ko-KR', { hour12: false }) : '',
             title: `VLM Alarm: ${e.secondClassificationResult || '이상 상황'}`,
             desc: e.vlmSituationDesc,
             ttsText: e.vlmTtsCandidate,
@@ -118,8 +117,15 @@ function App() {
 
   // 미인증 상태에서는 대시보드를 아예 마운트하지 않는다.
   // (오버레이로만 가리면 Sidebar 등이 먼저 마운트되어 인증 필요한 API가 403으로 실패한다)
+  // ⚠️ Toaster를 로그인 화면에도 걸어야 한다. 아래 대시보드 쪽에만 두면
+  //    로그인·가입 화면의 toast가 아무것도 띄우지 않고 조용히 사라진다.
   if (!isLoggedIn) {
-    return <LoginScreen onLoginSuccess={handleLoginSuccess} />;
+    return (
+      <>
+        <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
+      </>
+    );
   }
 
   return (

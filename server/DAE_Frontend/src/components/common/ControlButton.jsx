@@ -26,9 +26,14 @@ export default function ControlButton({
         if (!disabled) onClick?.(e);
       }}
       disabled={disabled}
+      /* 150ms — 사람이 "반응했다"고 느끼는 하한이 대략 100ms이고
+         지연으로 느끼기 시작하는 것이 300ms 근처다. 관제 조작이라
+         200ms를 넘기지 않는다. active:scale은 눌린 감촉만 주고
+         레이아웃을 밀지 않는다(transform이므로 리플로우 없음). */
       className={`${full ? 'col-span-2' : ''} w-full py-2 rounded-lg border text-xs font-bold shadow-sm
-                  transition-colors flex items-center justify-center gap-1
-                  disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-inherit
+                  transition-all duration-150 ease-out active:scale-[0.97]
+                  flex items-center justify-center gap-1
+                  disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-inherit disabled:active:scale-100
                   ${TONES[tone] ?? TONES.default}`}
     >
       <span className="material-symbols-outlined text-[14px]">{icon}</span>

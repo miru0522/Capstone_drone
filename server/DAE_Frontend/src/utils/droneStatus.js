@@ -39,6 +39,25 @@ export const isBatteryRtl = (drone) =>
 export const isAirborne = (status) =>
   ['PATROLLING', 'PAUSED', 'RETURNING', 'LANDING'].includes(status);
 
+/**
+ * 명령 이름을 사람이 읽을 말로. 다른 관제사의 조작을 알릴 때 쓴다.
+ * 서버가 보내는 action 값을 그대로 키로 쓴다(통신 스펙 §2).
+ */
+export const COMMAND_LABEL = {
+  START_PATROL: '순찰 시작',
+  RESUME_PATROL: '순찰 재개',
+  PAUSE_PATROL: '순찰 중지',
+  CANCEL_PATROL: '순찰 취소',
+  RETURN_TO_STATION: '스테이션 복귀',
+  LAND: '안전 착륙',
+  EMERGENCY_STOP: '비상 정지',
+  SET_ROUTE: '경로 지정',
+  SET_STATION: '스테이션 지정',
+};
+
+/** 조작 표시를 이 시간까지만 「조작 중」으로 본다. */
+export const OPERATING_WINDOW_MS = 30_000;
+
 /** 상태 전환 시 관제사에게 알릴 문구. null이면 알리지 않는다. */
 export const STATUS_TOAST = {
   PATROLLING: '순찰을 시작합니다.',

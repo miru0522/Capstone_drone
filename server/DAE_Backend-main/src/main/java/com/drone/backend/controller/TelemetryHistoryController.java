@@ -34,13 +34,16 @@ public class TelemetryHistoryController {
     }
 
     // 비행 세션 목록 (Flight History 목록 뷰)
-    // 예: GET /telemetry/history/DR-SIM/sessions?date=2026-08-14
+    // 예: GET /drones/DR-SIM/flights?from=2026-09-04T15:00:00&to=2026-09-11T15:00:00
+    //     from/to 는 DB와 같은 UTC 기준. 없으면 기존 hours/date 규칙을 따른다.
     @GetMapping("/flights")
     public ResponseEntity<List<FlightSessionResponse>> getSessions(
             @PathVariable String droneId,
             @RequestParam(required = false, defaultValue = "24") Integer hours,
-            @RequestParam(required = false) String date) {
+            @RequestParam(required = false) String date,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
 
-        return ResponseEntity.ok(telemetryHistoryService.getSessions(droneId, hours, date));
+        return ResponseEntity.ok(telemetryHistoryService.getSessions(droneId, hours, date, from, to));
     }
 }

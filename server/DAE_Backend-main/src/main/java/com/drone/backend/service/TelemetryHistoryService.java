@@ -45,8 +45,13 @@ public class TelemetryHistoryService {
      * 반드시 다운샘플링 "이전"의 원시 행으로 계산해야 한다. 상태 전이는 대개 제자리에서
      * 일어나므로(착륙 → IDLE) 5m 필터를 거치면 경계 지점이 사라진다.
      */
-    public List<FlightSessionResponse> getSessions(String droneId, Integer hours, String date) {
-        LocalDateTime[] range = resolveRange(hours, date);
+    public List<FlightSessionResponse> getSessions(String droneId, Integer hours, String date,
+                                                   LocalDateTime from, LocalDateTime to) {
+        // 구간 상한은 두지 않는다. 지상에서는 60초에 한 행만 남기므로(TelemetryService)
+        // 보존 기간 전체(90일)를 봐도 행이 많지 않다.
+        LocalDateTime[] range = (from != null && to != null)
+                ? new LocalDateTime[]{ from, to }
+                : resolveRange(hours, date);
         List<TelemetryHistory> rows = telemetryHistoryRepository
                 .findByDroneIdAndTimestampBetweenOrderByTimestampAsc(droneId, range[0], range[1]);
 

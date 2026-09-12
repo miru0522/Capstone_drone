@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import ConfirmDialog from '../common/ConfirmDialog';
 import useDroneStore from '../../store/useDroneStore';
 import useUserStore from '../../store/useUserStore';
 import { getRoutes, getWaypoints, createRoute, updateRoute, deleteRoute, checkRouteName } from '../../services/api';
@@ -26,6 +27,10 @@ export default function RouteManagerModal() {
   const [newComment, setNewComment] = useState('');
   // 수정 중인 경로. null이면 목록만 보여준다.
   const [editing, setEditing] = useState(null);
+  // 삭제 확인 대화상자를 띄울 대상. null 이면 닫혀 있다.
+  // ⚠️ 훅은 조건부 return 앞에 모아 둔다 - 뒤에 두면 렌더마다 호출 순서가 달라진다.
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const load = async () => {
     setIsLoading(true);
@@ -140,14 +145,19 @@ export default function RouteManagerModal() {
     }
   };
 
-  const handleDelete = async (route) => {
-    if (!window.confirm(`'${route.routeName}' 경로를 삭제할까요?`)) return;
+  const handleDelete = (route) => setDeleteTarget(route);
+
+  const runDelete = async () => {
+    setIsDeleting(true);
     try {
-      await deleteRoute(route.routeId);
+      await deleteRoute(deleteTarget.routeId);
       toast.success('경로를 삭제했습니다.');
+      setDeleteTarget(null);
       load();
-    } catch {
-      toast.error('경로 삭제에 실패했습니다.');
+    } catch (err) {
+      toast.error(err.userMessage ?? '경로 삭제에 실패했습니다.');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -308,6 +318,27 @@ export default function RouteManagerModal() {
           </button>
         </div>
       </div>
+
+      {deleteTarget && (
+        <ConfirmDialog
+          tone="danger"
+          icon="route"
+          title="경로 삭제"
+          subtitle={deleteTarget.routeName}
+          confirmLabel="삭제"
+          isBusy={isDeleting}
+          onConfirm={runDelete}
+          onClose={() => setDeleteTarget(null)}
+        >
+          <p>
+            <span className="font-bold bg-gray-100 px-1 rounded">{deleteTarget.routeName}</span> 경로와 그 지점들이 삭제됩니다.
+            <span className="text-red-500 font-bold bg-red-50 px-1 mt-1 inline-block">되돌릴 수 없습니다.</span>
+            <span className="block text-xs text-gray-500 mt-2">
+              이 경로로 순찰 중인 드론은 멈추지 않습니다. 드론에 이미 내려간 경로는 그대로 남습니다.
+            </span>
+          </p>
+        </ConfirmDialog>
+      )}
     </div>
   );
 }

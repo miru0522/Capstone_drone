@@ -1,10 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import useDroneStore from '../../store/useDroneStore';
+import useUserStore from '../../store/useUserStore';
 import { resumePatrol, returnToBase, approveTTS } from '../../services/api';
 import { getApiBaseUrl } from '../../config';
 
 export default function TTSApprovalModal() {
   const { isOpen, alertId } = useDroneStore((state) => state.ttsModal);
+  // 경고 방송은 현장에 실제로 소리를 내보내는 조작이다. 서버도 ADMIN·OPERATOR만
+  // 허용한다(SecurityConfig). VIEWER에게 버튼을 보여줄 이유가 없다.
+  const role = useUserStore((state) => state.userInfo?.role);
+  const canOperate = role === 'ADMIN' || role === 'OPERATOR';
   const [isMuted, setIsMuted] = useState(true);
   const [step, setStep] = useState(1);
   const currentAlert = useDroneStore((state) => 
@@ -36,7 +42,7 @@ export default function TTSApprovalModal() {
       console.log(`[STOMP] 드론 ${targetId} 순찰 재개 명령 전송 완료!`);
       } catch (error) {
         console.error("[STOMP] 순찰 재개 실패", error);
-        alert("순찰 재개 명령 중 에러가 발생했습니다.");
+        toast.error("순찰 재개 명령 중 에러가 발생했습니다.");
       } finally {
         resolveAlert(alertId);
         closeTTSModal();
@@ -63,12 +69,12 @@ export default function TTSApprovalModal() {
       setStep(2);
     } catch (error) {
       console.error(error);
-      alert("경고 방송 송출 중 에러가 발생했습니다.");
+      // 권한 부족(403)을 "서버 오류"로 알리면 관제사가 장애로 오해한다.
+      toast.error(error.userMessage ?? "경고 방송 송출 중 에러가 발생했습니다.");
     }
   };
 
   const handleReturnToBase = async () => {
-    console.log("순찰 복귀 버튼 클릭. 현재 경보 데이터:", currentAlert);
     
     const targetId = currentAlert?.droneId || "DR-01";
     
@@ -84,7 +90,7 @@ export default function TTSApprovalModal() {
       closeTTSModal();
     } catch (e) {
       console.error(e);
-      alert("순찰 복귀 명령 실패");
+      toast.error("순찰 복귀 명령 실패");
     }
   };
 
@@ -238,12 +244,16 @@ export default function TTSApprovalModal() {
                   >
                     거절 (무시)
                   </button>
-                  <button 
-                    onClick={handleApproveTTS} 
-                    className="px-6 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 shadow-sm transition-colors"
-                  >
-                    경고 방송 송출
-                  </button>
+                  {canOperate ? (
+                    <button 
+                      onClick={handleApproveTTS} 
+                      className="px-6 py-2 rounded-lg text-sm font-medium bg-red-600 text-white hover:bg-red-700 shadow-sm transition-colors"
+                    >
+                      경고 방송 송출
+                    </button>
+                  ) : (
+                    <p className="text-[11px] text-gray-400 self-center px-2">조회 권한으로는 방송할 수 없습니다.</p>
+                  )}
                 </>
               ) : (
                 <>

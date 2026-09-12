@@ -1,6 +1,7 @@
 import { Client } from '@stomp/stompjs';
 import useDroneStore from '../store/useDroneStore';
-import { STATUS_TOAST, BATTERY_RTL_TOAST } from '../utils/droneStatus';
+import { STATUS_TOAST, BATTERY_RTL_TOAST, COMMAND_LABEL } from '../utils/droneStatus';
+import useUserStore from '../store/useUserStore';
 import toast from 'react-hot-toast';
 
 let stompClient = null;
@@ -67,8 +68,13 @@ export const connectWebSocket = () => {
               altitude: t.altitude ?? t.gps?.abs_alt_m ?? t.gps?.alt ?? 120,
               battery: t.battery?.remaining_percent ?? (typeof t.battery === 'number' ? t.battery : 100),
               // 재개할 경로가 남아 있는가 — PAUSED일 때 "순찰 재개"/"순찰 시작"을 가른다.
-              // 드론이 안 보내면(구버전·실기 미구현) true로 두어 기존 동작을 유지한다.
-              hasRoute: t.hasRoute ?? true,
+              //
+              // ⚠️ 모를 때는 "없다"로 본다. 예전에는 true로 낙관했는데,
+              //    드론이 이 필드를 아직 안 보내던 시기에 화면이 「현재 경로 유지」를
+              //    허용해 SET_ROUTE 없이 순찰이 시작됐다. 드론에는 경로가 없어
+              //    2m 남짓한 저고도 호버링만 했다 (2026-08-25 실기).
+              //    false면 「순찰 시작」이 떠서 경로 선택을 강제하므로 반드시 SET_ROUTE가 나간다.
+              hasRoute: t.hasRoute ?? false,
               currentAction: t.currentAction ?? null,
               ...(t.station && { station: t.station })
             });
@@ -86,6 +92,26 @@ export const connectWebSocket = () => {
           if (alertData.type?.toUpperCase() === 'CRITICAL' || alertData.type?.toUpperCase() === 'WARNING') {
             useDroneStore.getState().openTTSModal(alertData.id);
           }
+        }
+      });
+
+      // 다른 관제사가 드론에 명령을 보냈다는 알림.
+      // 점유를 걸지 않기로 했으므로, 최소한 서로의 조작이 보여야 한다 —
+      // 예전에는 내가 순찰을 시작한 직후 남이 착륙시켜도 알 방법이 없었다.
+      stompClient.subscribe('/topic/drones/commands', (message) => {
+        if (!message.body) return;
+        try {
+          const op = JSON.parse(message.body);
+          useDroneStore.getState().noteDroneOperation(op);
+
+          // 내가 누른 것은 알리지 않는다. 이미 안다.
+          const me = useUserStore.getState().userInfo?.name;
+          if (op.operator && op.operator !== me) {
+            const label = COMMAND_LABEL[op.action] ?? op.action;
+            toast(`${op.operator} → [${op.droneId}] ${label}`, { icon: '👤' });
+          }
+        } catch (e) {
+          console.error('조작 알림 파싱 실패', e);
         }
       });
 

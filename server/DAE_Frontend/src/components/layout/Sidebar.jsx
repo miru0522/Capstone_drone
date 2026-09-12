@@ -28,7 +28,10 @@ export default function Sidebar() {
     }
 
     const uStore = useUserStore.getState();
-    
+
+    // 좁은 화면에서는 사이드바가 지도를 덮는 서랍이다. 메뉴를 골랐으면 닫는다.
+    dStore.setSidebarOpen(false);
+
     dStore.setRouteManagerOpen(false);
     dStore.setDroneStatusOpen(false);
     if (dStore.isRegisterModalOpen) dStore.closeRegisterModal();
@@ -67,12 +70,29 @@ export default function Sidebar() {
     return oa - ob;
   });
 
+  // 드론 등록은 ADMIN 전용이다(서버 DroneController). 다른 역할에게 메뉴를
+  // 보여주면 열어서 입력하고 나서야 거부당한다.
+  const isAdmin = useUserStore((state) => state.userInfo?.role) === 'ADMIN';
+  const isSidebarOpen = useDroneStore((state) => state.isSidebarOpen);
+  const setSidebarOpen = useDroneStore((state) => state.setSidebarOpen);
+
   return (
-    <aside className="hidden md:flex flex-col h-full w-[280px] py-6 px-4 gap-2 bg-[#f8f9ff] border-r border-[#c2c6d6] shrink-0">
+    <>
+    {/* 서랍이 열렸을 때 뒤를 덮는다. 밖을 누르면 닫힌다.
+        md 이상에서는 사이드바가 고정이므로 이 막도 필요 없다. */}
+    {isSidebarOpen && (
+      <div
+        className="md:hidden fixed inset-0 z-[590] bg-black/30"
+        onClick={() => setSidebarOpen(false)}
+      />
+    )}
+    <aside className={`flex flex-col h-full w-[280px] py-6 px-4 gap-2 bg-[#f8f9ff] border-r border-[#c2c6d6] shrink-0
+      fixed md:static inset-y-0 left-0 z-[600] transition-transform duration-200
+      ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
       <div className="px-4 mb-6 flex justify-between items-start">
         <div>
-          <h2 className="text-lg font-semibold text-[#0058be]">System Active</h2>
-          <p className="text-xs font-medium text-[#424754]">All units online</p>
+          <h2 className="text-lg font-semibold text-[#0058be]">ADD Project</h2>
+          <p className="text-xs font-medium text-[#424754]">Drone Surveillance Control</p>
         </div>
       </div>
       <nav className="flex-none flex flex-col gap-1">
@@ -100,17 +120,20 @@ export default function Sidebar() {
           <span className="material-symbols-outlined" style={{ fontVariationSettings: activeMenu === 'status' ? "'FILL' 1" : "'FILL' 0" }}>analytics</span>
           <span className="text-sm font-medium">Drone Status</span>
         </button>
-        <button 
-          onClick={() => handleMenuSwitch(() => useDroneStore.getState().openRegisterModal())}
-          className={`flex items-center gap-4 p-4 w-full text-left rounded-lg transition-all duration-200 active:translate-x-1 ${
-            activeMenu === 'management' ? 'bg-[#dae2fd] text-[#5c647a]' : 'text-[#424754] hover:bg-[#e5eeff]'
-          }`}>
-          <span className="material-symbols-outlined" style={{ fontVariationSettings: activeMenu === 'management' ? "'FILL' 1" : "'FILL' 0" }}>settings_suggest</span>
-          <span className="text-sm font-medium">Drone Management</span>
-        </button>
+        {isAdmin && (
+          <button 
+            onClick={() => handleMenuSwitch(() => useDroneStore.getState().openRegisterModal())}
+            className={`flex items-center gap-4 p-4 w-full text-left rounded-lg transition-all duration-200 active:translate-x-1 ${
+              activeMenu === 'management' ? 'bg-[#dae2fd] text-[#5c647a]' : 'text-[#424754] hover:bg-[#e5eeff]'
+            }`}>
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: activeMenu === 'management' ? "'FILL' 1" : "'FILL' 0" }}>settings_suggest</span>
+            <span className="text-sm font-medium">Drone Management</span>
+          </button>
+        )}
       </nav>
       
       <DroneStatus />
     </aside>
+    </>
   );
 }

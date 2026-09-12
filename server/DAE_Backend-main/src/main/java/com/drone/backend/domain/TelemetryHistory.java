@@ -9,7 +9,10 @@ import java.time.LocalDateTime;
 @Entity
 @Getter
 @NoArgsConstructor
-@Table(name = "telemetry_history")
+// 조회는 항상 "이 드론의 이 구간"이다. 이게 없어서 모든 조회가 전체를 훑었다(2026-09-11).
+@Table(name = "telemetry_history", indexes = {
+        @Index(name = "idx_telemetry_drone_time", columnList = "drone_id, timestamp")
+})
 public class TelemetryHistory {
     
     @Id

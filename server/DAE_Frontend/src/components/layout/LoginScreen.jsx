@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { login, registerUser, checkUserId } from '../../services/api';
+
+/** 서버 User.userId 컬럼(length=32)·UserService.USER_ID_MAX 와 같은 값이어야 한다. */
+const USER_ID_MAX = 32;
 
 export default function LoginScreen({ onLoginSuccess }) {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
@@ -19,6 +23,11 @@ export default function LoginScreen({ onLoginSuccess }) {
   useEffect(() => {
     if (!isRegisterMode || id.trim().length < 2) {
       setIdStatus(null);
+      return;
+    }
+    // 너무 길면 중복 조회를 보낼 필요가 없다. 어차피 못 쓴다.
+    if (id.trim().length > USER_ID_MAX) {
+      setIdStatus('toolong');
       return;
     }
     setIdStatus('checking');
@@ -46,6 +55,11 @@ export default function LoginScreen({ onLoginSuccess }) {
           setIsLoading(false);
           return;
         }
+        if (id.trim().length > USER_ID_MAX) {
+          setError(`아이디는 ${USER_ID_MAX}자 이내로 입력해 주세요.`);
+          setIsLoading(false);
+          return;
+        }
         if (idStatus === 'taken') {
           setError('이미 사용 중인 아이디입니다.');
           setIsLoading(false);
@@ -53,7 +67,7 @@ export default function LoginScreen({ onLoginSuccess }) {
         }
         // 회원가입
         await registerUser({ userId: id, pwd, name, email });
-        alert('가입이 신청되었습니다. 관리자 승인 후 로그인할 수 있으며, 처음에는 조회 권한으로 시작합니다.');
+        toast.success('가입이 신청되었습니다. 관리자 승인 후 로그인할 수 있으며, 처음에는 조회 권한으로 시작합니다.', { duration: 6000 });
         setIsRegisterMode(false);
         setId('');
         setPwd('');
@@ -69,8 +83,15 @@ export default function LoginScreen({ onLoginSuccess }) {
       if (isRegisterMode) {
         setError(err.response?.data?.message ?? '회원가입에 실패했습니다. 잠시 후 다시 시도해주세요.');
       } else {
+        // 403 의 사유는 서버가 상태별로 만들어 보낸다 - 승인 대기인지,
+        // 거절인지, 거절이면 그 사유까지. 화면이 자기 문구로 덮으면
+        // 신청자가 계속 기다려야 하는지 알 수 없다.
+        // UserController 가 e.getReason() 을 본문에 그대로 넣는다(문자열).
+        // 전역 include-message 를 켜면 다른 예외 메시지까지 노출되므로 쓰지 않는다.
+        const body = err.response?.data;
+        const fromServer = typeof body === 'string' ? body : body?.message;
         if (err.response?.status === 403) {
-          setError('승인 대기 중이거나 반려된 계정입니다. 관리자에게 문의해주세요.');
+          setError(fromServer || '승인 대기 중이거나 거절된 계정입니다. 관리자에게 문의해주세요.');
         } else {
           setError('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.');
         }
@@ -92,8 +113,13 @@ export default function LoginScreen({ onLoginSuccess }) {
   };
 
   return (
-    <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-[#0b1c30] bg-opacity-95 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative animate-in fade-in zoom-in duration-300">
+    <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-[#0b1c30]/95 backdrop-blur-sm">
+      {/* key를 모드에 묶어 로그인↔회원가입 전환 때 카드가 다시 마운트되게 한다.
+          key가 없으면 React가 같은 노드를 재사용해 animate-in 이 재생되지 않는다. */}
+      <div
+        key={isRegisterMode ? 'signup' : 'login'}
+        className="bg-white w-full max-w-md rounded-2xl shadow-2xl p-8 relative animate-in fade-in slide-in-from-bottom-2 duration-200"
+      >
         {/* 로고 첫 등장 시퀀스. 로그인 화면은 처음 그려지는 자리라
             워드마크 와이프까지 그대로 재생해도 어색하지 않다. */}
         <div className="logo-intro flex flex-col items-center mb-8">
@@ -135,7 +161,7 @@ export default function LoginScreen({ onLoginSuccess }) {
               value={id}
               onChange={(e) => setId(e.target.value)}
               className={`w-full px-4 py-2 border rounded-lg focus:ring-2 outline-none transition-all ${
-                isRegisterMode && idStatus === 'taken'
+                isRegisterMode && (idStatus === 'taken' || idStatus === 'toolong')
                   ? 'border-red-400 focus:ring-red-500/30 focus:border-red-500'
                   : 'border-gray-300 focus:ring-[#0058be] focus:border-[#0058be]'
               }`}
@@ -144,10 +170,11 @@ export default function LoginScreen({ onLoginSuccess }) {
             />
             {isRegisterMode && idStatus && (
               <p className={`text-xs mt-1 ${
-                idStatus === 'taken' ? 'text-red-500 font-semibold'
+                idStatus === 'taken' || idStatus === 'toolong' ? 'text-red-500 font-semibold'
                   : idStatus === 'free' ? 'text-green-600 font-semibold' : 'text-gray-400'
               }`}>
                 {idStatus === 'checking' ? '확인 중…'
+                  : idStatus === 'toolong' ? `아이디는 ${USER_ID_MAX}자 이내여야 합니다. (현재 ${id.trim().length}자)`
                   : idStatus === 'taken' ? '이미 사용 중인 아이디입니다.'
                   : '사용할 수 있는 아이디입니다.'}
               </p>

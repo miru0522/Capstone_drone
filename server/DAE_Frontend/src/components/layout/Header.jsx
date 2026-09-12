@@ -111,7 +111,17 @@ export default function Header() {
             </p>
           </div>
         </div>
-        <nav className="hidden md:flex ml-8 items-center gap-6">
+        {/* 좁은 화면에서는 사이드바가 서랍이라 여는 버튼이 필요하다.
+            없으면 md 미만에서 드론 조작에 아예 접근할 수 없다. */}
+        <button
+          type="button"
+          onClick={() => useDroneStore.getState().setSidebarOpen(true)}
+          aria-label="메뉴 열기"
+          className="md:hidden ml-2 p-2 rounded-lg text-[#424754] hover:bg-[#eff4ff] transition-colors cursor-pointer"
+        >
+          <span className="material-symbols-outlined">menu</span>
+        </button>
+        <nav className="hidden sm:flex ml-4 md:ml-8 items-center gap-2 md:gap-6">
           <a onClick={goToDashboard} className={`${!isAccountModalOpen && !isHistoryOpen ? 'text-[#0058be] border-b-2 border-[#0058be]' : 'text-[#424754] hover:bg-[#eff4ff] transition-colors rounded-lg'} font-medium text-sm py-2 px-4 cursor-pointer`}>DASHBOARD</a>
           <a onClick={openHistory} className={`${isHistoryOpen ? 'text-[#0058be] border-b-2 border-[#0058be]' : 'text-[#424754] hover:bg-[#eff4ff] transition-colors rounded-lg'} font-medium text-sm py-2 px-4 cursor-pointer`}>HISTORY</a>
           <a onClick={openAccountModal} className={`${isAccountModalOpen ? 'text-[#0058be] border-b-2 border-[#0058be]' : 'text-[#424754] hover:bg-[#eff4ff] transition-colors rounded-lg'} font-medium text-sm py-2 px-4 cursor-pointer`}>ACCOUNTS</a>

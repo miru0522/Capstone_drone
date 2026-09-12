@@ -26,6 +26,7 @@ from datetime import datetime
 import threading
 import json
 import tempfile
+import subprocess
 from contextlib import asynccontextmanager
 
 # GPU 메모리 단편화 방지 (torch import 전에 설정해야 유효)
@@ -393,11 +394,50 @@ def generate_tts(request: TtsRequest):
         raise HTTPException(status_code=500, detail=f"TTS 생성 중 에러: {str(e)}")
 
 
+def _to_browser_mp4(src_path: str) -> str:
+    """브라우저 <video>가 재생·탐색할 수 있는 MP4로 바꿔 그 경로를 돌려준다.
+
+    드론은 mp4v(MPEG-4 Part 2)로 인코딩해 보낸다 — 젯슨의 하드웨어 H.264 인코더가
+    멈추는 문제 때문에 일부러 고른 것이다(드론 uploader.py). 그런데 브라우저는
+    mp4v를 디코딩하지 못해 사고 영상이 재생되지 않았다(event 277부터).
+    또 OpenCV는 moov(프레임 색인)를 파일 끝에 써서, 재생은 돼도 탐색이 안 됐다.
+
+    이미 H.264면 다시 인코딩하지 않고 색인만 앞으로 옮긴다(무손실, 빠름).
+    변환이 실패하면 원본을 그대로 돌려준다 — 영상이 재생 안 되는 것보다
+    사고 기록이 통째로 사라지는 쪽이 나쁘다.
+    """
+    out_path = os.path.splitext(src_path)[0] + "_web.mp4"
+    try:
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=codec_name", "-of", "csv=p=0", src_path],
+            capture_output=True, text=True, timeout=30,
+        )
+        if probe.stdout.strip() == "h264":
+            cmd = ["ffmpeg", "-y", "-v", "error", "-i", src_path,
+                   "-c", "copy", "-movflags", "+faststart", out_path]
+        else:
+            cmd = ["ffmpeg", "-y", "-v", "error", "-i", src_path,
+                   "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
+                   # yuv420p는 가로·세로가 짝수여야 한다
+                   "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2",
+                   "-c:a", "aac", "-movflags", "+faststart", out_path]
+        subprocess.run(cmd, check=True, capture_output=True, timeout=180)
+        if os.path.getsize(out_path) > 0:
+            return out_path
+    except Exception as e:
+        print(f"[AI Server] 브라우저용 변환 실패, 원본을 보낸다: {e}")
+    return src_path
+
+
 @app.post("/analyze-video")
 async def analyze_video_pipeline(
     video: UploadFile = File(...),
     eventData: str = Form(None),
-    drone_id: str = Form("DR-01")
+    drone_id: str = Form("DR-01"),
+    # 드론이 1차 필터(VadCLIP) 점수를 싣는 필드(uploader.py B안).
+    # 선언하지 않으면 FastAPI가 조용히 버려, 1차 점수가 전부 0으로 저장됐다.
+    anomaly_score: Optional[float] = Form(None),
 ):
     """
     ★ 메인 파이프라인 ★
@@ -405,6 +445,7 @@ async def analyze_video_pipeline(
     """
     # finally에서 참조하므로 try 진입 전에 정의해 둔다 (NameError 방지)
     temp_video_path = None
+    web_video_path = None
 
     try:
         # 1. 파일 임시 저장
@@ -467,6 +508,8 @@ async def analyze_video_pipeline(
             "description": admin_log,
             "ttsText": audio_alert,
         }
+        if anomaly_score is not None:
+            event_data_dict["vadScore"] = anomaly_score
 
         # [수정 2026-08-05] eventData override를 MOCK/REAL 공통 경로로 이동.
         # 이전에는 REAL 분기 안에만 있어서 MOCK_MODE로 E2E 검증할 때
@@ -485,8 +528,11 @@ async def analyze_video_pipeline(
         backend_url = f"{BACKEND_URL}/events"
         headers = {"X-Device-Key": DEVICE_KEY}
 
-        with open(temp_video_path, "rb") as vf:
-            files = {"video": (video.filename, vf, video.content_type)}
+        # 분석은 원본으로 했다. 저장·재생용으로만 브라우저가 읽는 형식으로 바꾼다.
+        web_video_path = _to_browser_mp4(temp_video_path)
+
+        with open(web_video_path, "rb") as vf:
+            files = {"video": (video.filename, vf, "video/mp4")}
 
             # TTS WAV가 생성된 경우 함께 전송
             audio_file_handle = None
@@ -534,7 +580,8 @@ async def analyze_video_pipeline(
         # 이전에는 해피패스에만 있어서 추론·릴레이 도중 예외가 나면
         # 업로드된 클립이 temp에 계속 쌓였다.
         try:
-            if temp_video_path and os.path.exists(temp_video_path):
-                os.remove(temp_video_path)
+            for p in (temp_video_path, web_video_path):
+                if p and os.path.exists(p):
+                    os.remove(p)
         except OSError as cleanup_err:
             print(f"[AI Server] 임시 파일 삭제 실패: {cleanup_err}")

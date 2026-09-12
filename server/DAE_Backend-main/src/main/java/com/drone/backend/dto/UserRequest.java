@@ -40,6 +40,14 @@ public class UserRequest {
     @Getter
     @Setter
     @Data
+    public static class Reject {
+        /** 선택 입력. 비어 있으면 사유 없이 거절만 기록한다. */
+        private String reason;
+    }
+
+    @Getter
+    @Setter
+    @Data
     public static class AdminUpdate {
         private String name;
         private String email;

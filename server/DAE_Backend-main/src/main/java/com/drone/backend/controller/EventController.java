@@ -6,12 +6,14 @@ import com.drone.backend.service.TtsService;
 import com.drone.backend.repository.DroneRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
 import java.io.File;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
@@ -31,10 +33,26 @@ public class EventController {
     private final TtsService ttsService;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
+    /**
+     * @param from, to 비우면 전체. 미조치 경보 복원(App.jsx)은 매개변수 없이 부르므로
+     *                 없을 때의 동작(전체)을 바꾸면 안 된다. 기준은 DB와 같은 UTC.
+     * @param droneId  여러 개 줄 수 있다. 비우면 전체 — 드론이 기록되지 않은 사고도 포함된다.
+     */
     @GetMapping
-    public ResponseEntity<List<EventLogDto>> getAllEvents() {
-        log.info("📊 [REST] 전체 이벤트 로그 조회");
-        List<EventLogDto> events = eventLogRepository.findAll()
+    public ResponseEntity<List<EventLogDto>> getAllEvents(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to,
+            @RequestParam(required = false) List<String> droneId) {
+        // 드론을 여러 대 고를 수 있다(?droneId=A&droneId=B). 없으면 전체.
+        List<String> drones = droneId == null ? List.of()
+                : droneId.stream().filter(s -> s != null && !s.isBlank()).map(String::trim).toList();
+        log.info("📊 [REST] 이벤트 로그 조회 from={} to={} drones={}", from, to, drones);
+        List<EventLog> found = !drones.isEmpty()
+                ? eventLogRepository.searchIn(drones, from, to)
+                : (from == null && to == null)
+                        ? eventLogRepository.findAll()
+                        : eventLogRepository.search(from, to);
+        List<EventLogDto> events = found
                 .stream()
                 .map(EventLogDto::fromEntity)
                 .collect(Collectors.toList());
@@ -118,9 +136,11 @@ public class EventController {
             Object vadObj = eventData.get("vadScore");
             if (vadObj != null) {
                 logEvent.setFirstAnomalyScore(Double.parseDouble(vadObj.toString()));
-            } else {
-                logEvent.setFirstAnomalyScore(Double.parseDouble(eventData.getOrDefault("score", "0").toString()));
+            } else if (eventData.get("score") != null) {
+                logEvent.setFirstAnomalyScore(Double.parseDouble(eventData.get("score").toString()));
             }
+            // 둘 다 없으면 비워 둔다. "1차 필터가 점수를 안 보냈다"와 "0점"은 다른 말이다.
+            // 예전에는 0을 넣어, 점수가 전달되지 않던 동안의 기록이 전부 0점처럼 보인다.
 
             Object maeObj = eventData.get("maeConfidence");
             if (maeObj != null) {

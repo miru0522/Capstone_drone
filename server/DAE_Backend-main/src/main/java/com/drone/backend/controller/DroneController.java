@@ -44,6 +44,16 @@ public class DroneController {
     }
 
     /** 조작 권한 검사. 통과하면 null, 아니면 그대로 반환할 응답. */
+    /**
+     * 명령을 보낸 관제사 이름. 관제 화면들에 "누가 무엇을 지시했는지" 알릴 때 쓴다.
+     * 토큰이 없거나 깨졌으면 null 이고, 그때는 알리지 않는다.
+     */
+    private String operatorName(HttpServletRequest request) {
+        String token = jwtUtil.extractTokenFromRequest(request);
+        if (token == null || !jwtUtil.validateToken(token)) return null;
+        return jwtUtil.getName(token);
+    }
+
     private ResponseEntity<String> denyIfCannotOperate(HttpServletRequest request) {
         String token = jwtUtil.extractTokenFromRequest(request);
         if (token == null || !jwtUtil.validateToken(token)) {
@@ -145,7 +155,7 @@ public class DroneController {
         command.put("action", "START_PATROL");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("순찰을 시작했습니다.");
     }
 
@@ -161,7 +171,7 @@ public class DroneController {
         command.put("action", "RESUME_PATROL");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("순찰을 재개했습니다.");
     }
 
@@ -181,7 +191,7 @@ public class DroneController {
         command.put("action", "CANCEL_PATROL");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("순찰을 취소했습니다.");
     }
 
@@ -197,7 +207,7 @@ public class DroneController {
         command.put("action", "PAUSE_PATROL");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("순찰을 일시정지했습니다.");
     }
 
@@ -213,7 +223,7 @@ public class DroneController {
         command.put("action", "RETURN_TO_STATION");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("스테이션으로 복귀합니다.");
     }
 
@@ -229,7 +239,7 @@ public class DroneController {
         command.put("action", "LAND");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("현재 위치에 착륙합니다.");
     }
 
@@ -249,7 +259,7 @@ public class DroneController {
         command.put("action", "EMERGENCY_STOP");
         command.put("droneId", droneId);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         return ResponseEntity.ok("모터를 차단했습니다.");
     }
 
@@ -331,7 +341,7 @@ public class DroneController {
         command.put("droneId", droneId);
         command.put("route", route);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
         
         return ResponseEntity.ok("경로를 지정했습니다.");
     }
@@ -385,7 +395,7 @@ public class DroneController {
         command.put("droneId", droneId);
         command.put("station", safeLocation);
         messagingTemplate.convertAndSend("/topic/drones/" + droneId + "/commands", command);
-        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command));
+        eventPublisher.publishEvent(new com.drone.backend.event.DroneCommandEvent(this, droneId, command, operatorName(httpRequest)));
 
         log.info("🏠 {} 스테이션 지정: {}, {} (지면 {}m)", droneId, lat, lon, stationElev);
         return ResponseEntity.ok("스테이션을 지정했습니다.");

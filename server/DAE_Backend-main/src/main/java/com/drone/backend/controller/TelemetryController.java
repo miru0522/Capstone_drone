@@ -12,6 +12,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 public class TelemetryController {
 
     private final TelemetryService telemetryService;
+    private final com.drone.backend.service.DroneStateSyncService droneStateSyncService;
     private final org.springframework.messaging.simp.SimpMessagingTemplate messagingTemplate;
 
     /**
@@ -31,6 +32,11 @@ public class TelemetryController {
         //    검증 결과를 버리면 미등록·퇴역 드론의 텔레메트리가 그대로 화면에 올라온다.
         if (res.connected()) {
             messagingTemplate.convertAndSend("/topic/telemetry", telemetry);
+
+            // 3. 드론이 재부팅으로 경로·스테이션을 잊었으면 다시 내려보낸다.
+            //    잊은 채로 두면 「순찰 복귀」가 무반응이 되고 배터리 자율복귀가
+            //    갈 곳을 잃는다. 관제사는 화면(DB값)만 보고 있어 알 수 없다.
+            droneStateSyncService.syncIfNeeded(res.droneId(), telemetry.hasRoute());
         }
     }
 }

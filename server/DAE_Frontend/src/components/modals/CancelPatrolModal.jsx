@@ -1,4 +1,5 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import useDroneStore from '../../store/useDroneStore';
 import { emergencyStop } from '../../services/api';
 
@@ -14,7 +15,7 @@ export default function CancelPatrolModal() {
       closeCancelModal();
     } catch (e) {
       console.error(e);
-      alert("비상 정지(모터 차단) 명령 전송에 실패했습니다.");
+      toast.error("비상 정지(모터 차단) 명령 전송에 실패했습니다.");
     }
   };
 

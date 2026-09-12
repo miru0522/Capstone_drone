@@ -18,6 +18,10 @@ export default function LiveStreamModal() {
 
   const [phase, setPhase] = useState('starting');   // starting | live | error
   const [src, setSrc] = useState(null);
+  // 이 값이 바뀌면 아래 effect가 처음부터 다시 돈다 — 세션을 새로 열고 REQUEST_STREAM을 다시 보낸다.
+  // 서버가 재시작되면 세션이 사라지고 드론도 10초 뒤 스스로 멈추므로, 재개하려면
+  // 누군가 새 요청을 보내야 한다. 그 통로가 이 버튼이다.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!isOpen || !droneId) return;
@@ -44,7 +48,7 @@ export default function LiveStreamModal() {
       // 화면이 사라지는 길에 반드시 멈춘다. 서버의 410은 안전망이지 정상 경로가 아니다.
       stopStream(droneId);
     };
-  }, [isOpen, droneId]);
+  }, [isOpen, droneId, attempt]);
 
   if (!isOpen) return null;
 
@@ -72,7 +76,17 @@ export default function LiveStreamModal() {
             <p className="text-gray-400 text-xs">드론에 영상 전송을 요청하는 중…</p>
           )}
           {phase === 'error' && (
-            <p className="text-red-400 text-xs">영상을 시작하지 못했습니다. 드론 연결을 확인해 주세요.</p>
+            <div className="text-center">
+              <p className="text-red-400 text-xs mb-3">영상이 끊겼습니다. 드론 연결을 확인해 주세요.</p>
+              <button
+                type="button"
+                onClick={() => setAttempt((n) => n + 1)}
+                className="text-xs px-3 py-1.5 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors cursor-pointer inline-flex items-center gap-1"
+              >
+                <span className="material-symbols-outlined text-[14px]">refresh</span>
+                다시 시도
+              </button>
+            </div>
           )}
           {phase === 'live' && src && (
             <img

@@ -53,7 +53,7 @@ public class SecurityConfig {
                         // 1. 로그인/가입 등 익명 허용 경로
                         // check-id는 회원가입 중(로그인 전)에 호출되므로 익명 허용이어야 한다.
                         // logout·verify-password는 본인 확인이 필요하므로 아래 authenticated로 남긴다.
-                        .requestMatchers("/auth/login", "/auth/signup", "/auth/check-id",
+                        .requestMatchers("/auth/login", "/auth/signup", "/auth/check-id", "/auth/session",
                                          "/healthcheck", "/ws/**").permitAll()
                         // 2. 관리자 경로 (ADMIN 한정)
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
@@ -72,7 +72,9 @@ public class SecurityConfig {
                         // 드론 명령이 canOperate로 VIEWER를 막는 것과 같은 기준을 적용한다.
                         // (이 프로젝트는 ROLE_ 접두사를 쓰지 않는다 — JwtFilter가 역할명을 그대로 권한으로 넣는다)
                         .requestMatchers("/events/*/tts-approval").hasAnyAuthority("ADMIN", "OPERATOR")
-                        .requestMatchers("/events/**", "/wavdata/**", "/media/**", "/profile/**", "/drones/**", "/patrol-routes/**", "/users/**").authenticated()
+                        .requestMatchers("/events/**", "/wavdata/**", "/media/**", "/profile/**", "/drones/**", "/patrol-routes/**", "/users/**",
+                                         // 조작 이력은 조회 전용이라 VIEWER 도 본다.
+                                         "/command-logs").authenticated()
                         // 5. 기타 모든 경로
                         .requestMatchers( "/**").authenticated()
                 )

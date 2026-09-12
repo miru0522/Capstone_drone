@@ -18,7 +18,11 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_Id", nullable = false, length = 16)
+    /**
+     * 로그인 아이디. 길이 제한은 화면·서버·컬럼 세 곳이 같은 값을 봐야 한다
+     * (USER_ID_MAX). 어긋나면 화면을 통과한 값이 DB에서 터진다.
+     */
+    @Column(name = "user_Id", nullable = false, length = 32)
     private String userId;
 
     @Column(name = "pwd", nullable = false, length = 512)
@@ -54,6 +58,19 @@ public class User {
 
     @Column(name = "approved_by")
     private Long approvedBy;
+
+    /**
+     * 로그인이 막힌 이유. 본인이 로그인을 시도하면 이 문구를 보여준다.
+     *
+     * <b>반려(REJECTED)와 보관(DISABLED)이 이 컬럼을 함께 쓴다.</b> 둘 다
+     * "로그인이 막힌 이유"라는 성격이 같고, 승인·복원 시 지워지는 것도 같다.
+     * 컬럼 이름이 reject_reason 인 것은 반려에만 쓰던 시절의 잔재다 - 표기
+     * 하나 때문에 컬럼을 갈아엎지 않는다. 화면 라벨은 상태에 따라 갈린다.
+     *
+     * 선택 입력이므로 비어 있을 수 있다 - 그때는 사유 없이 사실만 알린다.
+     */
+    @Column(name = "reject_reason", length = 500)
+    private String rejectReason;
 
     @PrePersist
     protected void onCreate() {

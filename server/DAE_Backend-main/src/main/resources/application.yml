@@ -35,7 +35,15 @@ app:
   telemetry:
     retention:
       enabled: true
-      days: 90
+      # 다음 종합설계 팀이 이어받을 때까지 남도록 1년 (2026-09-11 결정).
+      # 지상에서는 60초에 한 행만 남기므로 1년이어도 드론당 수백 MB 수준이다.
+      days: 365
+  media:
+    # 사고 영상·음성 파일 보존. 지나면 파일만 지우고 사고 기록은 남긴다(MediaRetentionScheduler).
+    # ⚠️ 프론트 utils/time.js 의 MEDIA_RETENTION_DAYS 와 같아야 한다.
+    retention:
+      enabled: true
+      days: 365
   video:
     storage-dir: ./videodata
   profile:
@@ -44,7 +52,10 @@ app:
   ai-server:
     base-url: http://ai_server:8000
   cors:
-    allowed-origins: "http://203.249.90.3:8031,https://203.249.90.3:8031,http://203.249.90.3,https://203.249.90.3"
+    # ⚠️ 새 주소로 접속할 수 있게 되면 반드시 여기에 추가한다.
+    #    nginx가 Host를 그대로 넘기므로 스프링은 브라우저 Origin과 다르다고 보고
+    #    CORS 검사를 돌린다. 목록에 없으면 permitAll 경로(로그인 포함)도 403이 된다.
+    allowed-origins: "http://203.249.90.3:8031,https://203.249.90.3:8031,http://203.249.90.3,https://203.249.90.3,http://add-project.kro.kr:8031,https://add-project.kro.kr:8031,http://add-project.kro.kr,https://add-project.kro.kr"
 
 osrm:
   base-url: http://router.project-osrm.org
