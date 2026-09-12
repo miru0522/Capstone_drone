@@ -76,6 +76,13 @@ server/
   Jetson git 상태 확인 시 `jetson-live`뿐 아니라 현재 활성 브랜치도 함께 본다.
 - Rollback 기준점: `c387b52`(VadCLIP 이전 baseline) / branch `backup/pre-vadclip-20260828`,
   또는 `main.py.pre_v6_20260906_220842`(V6 직전 main.py 백업, 팀원이 남김).
+- 2026-09-12: 서버/백엔드 팀원(`kanshall`)이 올린 PR #1 반영 — 스트리밍이 서버로부터
+  `410`/`401`을 받아도 신호파일(`STREAM_REQUEST_STATE_PATH`)의 `stream_enabled`가 그대로
+  남아 1초 뒤 재시작을 반복하던 버그 수정(`StreamUploader._disable_stream_state()` 추가).
+  PR을 `main`에 머지(`4c127b6`) 후 동일 패치를 Jetson 실기에도 적용, `py_compile` +
+  격리 단위 테스트(신호파일 `stream_enabled` false 전환 확인) 통과, 커밋(`334ce39`) →
+  `vadclip-v4-20260831`/`jetson-live` 모두 동기화. 실제 카메라+서버 붙인 스트리밍 E2E는
+  미시험 — 관제 화면에서 영상 껐다 켰을 때 재시작 반복이 없는지 확인 필요.
 
 ## 3. 실기/서버 작업 원칙
 
