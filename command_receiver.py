@@ -304,6 +304,7 @@ class DroneCommandHandler:
                     "status": self._status,
                     "currentAction": current_action,
                     "hasRoute": bool(self._route),
+                    "hasStation": bool(self._station),
                 }, f)
         except Exception as e:
             logger.debug(f"상태 공유 파일 쓰기 실패: {e}")
