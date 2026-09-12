@@ -71,6 +71,10 @@ STREAM_JPEG_QUALITY = 80  # 0~100, 높을수록 고화질/고용량
 # REQUEST_STREAM/STOP_STREAM 수신 시 이 파일에 신호를 남긴다.
 STREAM_REQUEST_STATE_PATH = os.environ.get("STREAM_REQUEST_STATE_PATH", "/tmp/drone_stream_request.json")
 
+# 데모/리허설 전용: 카메라 대신 지정된 영상을 일정 시간 캡처 루프에 주입한다.
+# 운영 중 신호파일이 없으면 TestVideoInjector는 완전히 비활성(오버헤드 없음).
+TEST_INJECT_STATE_PATH = os.environ.get("TEST_INJECT_STATE_PATH", "/tmp/drone_test_inject.json")
+
 # ★2026-08-21 서버 확정 스펙: 영상은 STOMP가 아니라 HTTP로 전송.
 # (STOMP에 영상을 얹으면 EMERGENCY_STOP 등 제어명령이 영상 프레임
 #  뒤에 큐잉되어 늦게 도착하는 안전문제가 있다는 서버팀 설명 반영)
@@ -446,9 +450,98 @@ class StreamUploader:
             time.sleep(1.0 / fps)
 
 
+class TestVideoInjector:
+    """
+    데모/리허설 전용: 실행 중인 main.py의 캡처 루프에서, 실제 카메라 프레임 대신
+    지정된 영상 파일의 프레임을 일정 시간(duration_sec) 동안 대신 공급한다.
+
+    StreamUploader의 신호파일 패턴과 동일하게, 1초에 한 번만 신호파일
+    (TEST_INJECT_STATE_PATH)을 확인한다. 신호파일이 없으면(평상시/운영 중)
+    이 클래스는 아무 것도 하지 않아 오버헤드가 없다.
+
+    신호파일 형식: {"video_path": "...", "duration_sec": 15, "requested_at": <epoch>}
+    같은 requested_at은 한 번만 소비한다(중복 주입 방지).
+
+    ⚠️ 데모/리허설 전용이며 운영 트리거 로직(threshold, cooldown, hover 등)은
+    전혀 건드리지 않는다 - 주입된 프레임도 실제 카메라 프레임과 동일하게
+    RingBuffer -> VadCLIP 추론 -> 트리거 -> 업로드 경로를 그대로 통과한다.
+    """
+
+    def __init__(self):
+        self._cap: Optional[cv2.VideoCapture] = None
+        self._end_time: float = 0.0
+        self._consumed_at: Optional[float] = None
+        self._last_check: float = 0.0
+
+    def _check_new_request(self, now: float) -> None:
+        if now - self._last_check < 1.0:
+            return
+        self._last_check = now
+        try:
+            import json as _json
+            with open(TEST_INJECT_STATE_PATH, "r") as f:
+                req = _json.load(f)
+        except Exception:
+            return
+
+        requested_at = req.get("requested_at")
+        if requested_at is None or requested_at == self._consumed_at:
+            return
+
+        video_path = req.get("video_path")
+        duration = float(req.get("duration_sec", 15))
+        if not video_path or not os.path.exists(video_path):
+            logger.warning(f"[TestInject] 영상 경로 없음/찾을 수 없음: {video_path}")
+            self._consumed_at = requested_at
+            return
+
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            logger.warning(f"[TestInject] 영상 열기 실패: {video_path}")
+            self._consumed_at = requested_at
+            return
+
+        if self._cap is not None:
+            self._cap.release()
+        self._cap = cap
+        self._end_time = now + duration
+        self._consumed_at = requested_at
+        logger.warning(
+            f"[TestInject] \u26a0\ufe0f 테스트 모드 진입: {duration:.0f}초간 카메라 대신 "
+            f"'{video_path}' 프레임을 주입합니다 (실제 카메라 입력 아님)"
+        )
+
+    def maybe_get_frame(self):
+        """활성 상태면 (True, frame)을, 아니면 (False, None)을 반환한다."""
+        now = time.time()
+        self._check_new_request(now)
+
+        if self._cap is None:
+            return False, None
+
+        if now >= self._end_time:
+            logger.warning("[TestInject] 테스트 모드 종료 - 실제 카메라로 복귀")
+            self._cap.release()
+            self._cap = None
+            return False, None
+
+        ret, frame = self._cap.read()
+        if not ret:
+            # 영상이 끝나면 처음부터 반복 재생 (duration 다 찰 때까지)
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = self._cap.read()
+            if not ret:
+                logger.warning("[TestInject] 영상 재생 실패 - 실제 카메라로 복귀")
+                self._cap.release()
+                self._cap = None
+                return False, None
+        return True, frame
+
+
 class CameraAnomalyPipeline:
     def __init__(self, hover_controller: DroneHoverController):
         self.buffer = RingBuffer(maxlen=BUFFER_MAXLEN)
+        self._test_injector = TestVideoInjector()  # 데모/리허설 전용
         self.cap: Optional[cv2.VideoCapture] = None
         self._running = False
         self._last_trigger_time = 0.0
@@ -673,11 +766,13 @@ class CameraAnomalyPipeline:
 
         try:
             while self._running:
-                ret, frame = self.cap.read()
-                if not ret:
-                    logger.warning("프레임 읽기 실패, 재시도")
-                    time.sleep(0.1)
-                    continue
+                injected, frame = self._test_injector.maybe_get_frame()
+                if not injected:
+                    ret, frame = self.cap.read()
+                    if not ret:
+                        logger.warning("프레임 읽기 실패, 재시도")
+                        time.sleep(0.1)
+                        continue
 
                 self.buffer.push(frame)
                 self.latest_frame_for_stream = frame  # 스트리밍용 최신 프레임 갱신
