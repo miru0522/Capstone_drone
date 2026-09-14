@@ -1,4 +1,3 @@
-# TRT V6 MEMORY-SAFE ASYNC-UPLOAD COPY — original main.py/v4/v5 unchanged
 """
 main.py
 CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 호버링
@@ -7,10 +6,12 @@ CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 
   1. MAVSDK action.hold() 로 즉시 호버링 (제자리 정지)
   2. 영상을 서버(/analyze-video)로 전송
   3. 호버링 상태 유지 (재개는 command_receiver.py가 STOMP로 받는
-     별도 명령으로 처리 예정 - 아직 서버와 재개 명령 형식 미정)
+     RESUME_PATROL 등 명령으로 처리 - command_receiver.py의
+     DroneCommandHandler._resume_patrol() 참고)
 
-Edge 이상탐지는 VadCLIP으로 동작한다. 기존 Jigsaw-VAD/WideBranchNet은
-Git 기준본으로 롤백 가능하며, downstream 트리거/전송/호버링 인터페이스는 유지한다.
+Edge 이상탐지는 VadCLIP(TensorRT, V6 비동기 업로드 구조)으로 동작한다.
+기존 Jigsaw-VAD/WideBranchNet은 Git 기준본(c387b52)으로 롤백 가능하며,
+downstream 트리거/전송/호버링 인터페이스는 유지한다.
 """
 
 import os
@@ -30,14 +31,14 @@ import requests
 from mavsdk import System
 
 from ring_buffer import RingBuffer, FrameEntry, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
-from uploader import upload_clip_async, upload_clip_sync
+from uploader import upload_clip_sync
 from anomaly_model_trt import AnomalyPipeline
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("main_v4_trt")
+logger = logging.getLogger("main")
 
 # V6: live CSI / VadCLIP input resolution is unchanged.
 # Only the anomaly clip queued to the upload worker is reduced.
@@ -82,7 +83,6 @@ SERVER_HOST = os.environ.get("SERVER_URL", "http://203.249.90.3:8031")
 DEVICE_KEY = os.environ.get("DEVICE_KEY", "HPC-2026")
 STREAM_FRAME_TIMEOUT_SEC = 5.0     # 프레임 1장 업로드 타임아웃
 STREAM_NO_RESPONSE_LIMIT_SEC = 10.0  # 이 시간 무응답이면 자체 중지 (서버 확정 스펙)
-MAVSDK_URI = "serial:///dev/pixhawk:115200"
 
 
 def create_gstreamer_pipeline(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, fps=FPS) -> str:

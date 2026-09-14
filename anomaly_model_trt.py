@@ -1,7 +1,6 @@
-# TRT V4 COPY — original anomaly_model.py unchanged
 """
-anomaly_model.py
-VadCLIP 기반 Edge 1차 이상탐지 파이프라인.
+anomaly_model_trt.py
+VadCLIP 기반 Edge 1차 이상탐지 파이프라인 (TensorRT 버전).
 
 main.py와의 외부 인터페이스는 기존과 동일하게 유지한다.
     AnomalyPipeline()
@@ -18,7 +17,7 @@ import numpy as np
 
 from vadclip_adapter_trt import VadCLIPScorer
 
-logger = logging.getLogger("anomaly_model")
+logger = logging.getLogger("anomaly_model_trt")
 
 
 class AnomalyPipeline:
