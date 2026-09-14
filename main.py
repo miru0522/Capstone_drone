@@ -535,6 +535,16 @@ class TestVideoInjector:
                 self._cap.release()
                 self._cap = None
                 return False, None
+
+        # 2026-09-14 버그 수정: 주입 영상 해상도가 라이브 카메라 해상도와
+        # 다르면(예: 서버에 업로드됐던 클립은 960x540으로 축소된 상태인데
+        # 카메라는 1920x1080) RingBuffer 안에서 서로 다른 shape의 프레임이
+        # 섞여 np.stack()이 ValueError로 터지며 main.py 전체가 죽는다
+        # (실기 확인됨). 주입 프레임은 항상 라이브 캡처 해상도로 맞춘다.
+        if frame.shape[1] != CAMERA_WIDTH or frame.shape[0] != CAMERA_HEIGHT:
+            frame = cv2.resize(
+                frame, (CAMERA_WIDTH, CAMERA_HEIGHT), interpolation=cv2.INTER_AREA
+            )
         return True, frame
 
 
