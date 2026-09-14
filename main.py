@@ -468,10 +468,53 @@ class TestVideoInjector:
     """
 
     def __init__(self):
-        self._cap: Optional[cv2.VideoCapture] = None
+        self._frames: Optional[list] = None
+        self._frame_idx: int = 0
         self._end_time: float = 0.0
         self._consumed_at: Optional[float] = None
         self._last_check: float = 0.0
+
+    def _load_resampled_to_live_fps(self, video_path: str) -> list:
+        """
+        test_video_injection_trt.py의 load_video_resampled_to_9fps()와 동일 로직
+        재사용. 원본 영상의 실제 fps를 무시하고 그냥 1틱=1프레임으로 읽으면,
+        원본이 9fps보다 빠른 영상(예: 29.97fps)은 그만큼 슬로우모션으로
+        재생되어 VadCLIP의 48프레임/5.33초 추론창에 실제 액션이 거의 안 들어가는
+        문제가 있었다(2026-09-14 실기로 확인 - input_encoded_event2.mp4(29.97fps)
+        주입 시 점수가 오히려 baseline보다 낮게 나옴). 원본 fps 대비 간격
+        샘플링해서 라이브 캡처(FPS)와 동일한 실시간 속도로 맞춘다.
+        """
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            cap.release()
+            return []
+
+        src_fps = cap.get(cv2.CAP_PROP_FPS)
+        all_frames = []
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            if frame.shape[1] != CAMERA_WIDTH or frame.shape[0] != CAMERA_HEIGHT:
+                frame = cv2.resize(
+                    frame, (CAMERA_WIDTH, CAMERA_HEIGHT), interpolation=cv2.INTER_AREA
+                )
+            all_frames.append(frame)
+        cap.release()
+
+        if src_fps <= 0:
+            src_fps = 30.0
+        step = src_fps / FPS
+        resampled = []
+        idx = 0.0
+        while int(idx) < len(all_frames):
+            resampled.append(all_frames[int(idx)])
+            idx += step
+        logger.info(
+            "[TestInject] 리샘플링: 원본 fps=%.2f, 원본 %d프레임 -> 라이브 FPS=%d 기준 %d프레임",
+            src_fps, len(all_frames), FPS, len(resampled),
+        )
+        return resampled
 
     def _check_new_request(self, now: float) -> None:
         if now - self._last_check < 1.0:
@@ -495,15 +538,14 @@ class TestVideoInjector:
             self._consumed_at = requested_at
             return
 
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            logger.warning(f"[TestInject] 영상 열기 실패: {video_path}")
+        frames = self._load_resampled_to_live_fps(video_path)
+        if not frames:
+            logger.warning(f"[TestInject] 영상 로드 실패/빈 영상: {video_path}")
             self._consumed_at = requested_at
             return
 
-        if self._cap is not None:
-            self._cap.release()
-        self._cap = cap
+        self._frames = frames
+        self._frame_idx = 0
         self._end_time = now + duration
         self._consumed_at = requested_at
         logger.warning(
@@ -516,35 +558,17 @@ class TestVideoInjector:
         now = time.time()
         self._check_new_request(now)
 
-        if self._cap is None:
+        if self._frames is None:
             return False, None
 
         if now >= self._end_time:
             logger.warning("[TestInject] 테스트 모드 종료 - 실제 카메라로 복귀")
-            self._cap.release()
-            self._cap = None
+            self._frames = None
+            self._frame_idx = 0
             return False, None
 
-        ret, frame = self._cap.read()
-        if not ret:
-            # 영상이 끝나면 처음부터 반복 재생 (duration 다 찰 때까지)
-            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = self._cap.read()
-            if not ret:
-                logger.warning("[TestInject] 영상 재생 실패 - 실제 카메라로 복귀")
-                self._cap.release()
-                self._cap = None
-                return False, None
-
-        # 2026-09-14 버그 수정: 주입 영상 해상도가 라이브 카메라 해상도와
-        # 다르면(예: 서버에 업로드됐던 클립은 960x540으로 축소된 상태인데
-        # 카메라는 1920x1080) RingBuffer 안에서 서로 다른 shape의 프레임이
-        # 섞여 np.stack()이 ValueError로 터지며 main.py 전체가 죽는다
-        # (실기 확인됨). 주입 프레임은 항상 라이브 캡처 해상도로 맞춘다.
-        if frame.shape[1] != CAMERA_WIDTH or frame.shape[0] != CAMERA_HEIGHT:
-            frame = cv2.resize(
-                frame, (CAMERA_WIDTH, CAMERA_HEIGHT), interpolation=cv2.INTER_AREA
-            )
+        frame = self._frames[self._frame_idx % len(self._frames)]
+        self._frame_idx += 1
         return True, frame
 
 
