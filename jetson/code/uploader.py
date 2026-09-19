@@ -3,13 +3,13 @@ uploader.py  (서버 명세 v최종 기준)
 트리거 발생 시 RingBuffer 스냅샷 → mp4 인코딩 → AI 서버로 전송.
 
 서버 명세 (drone_integration_spec.md 기준):
-  URL   : http://203.249.90.3:8000/analyze-video
+  URL   : http://203.249.90.3:8031/analyze-video (nginx 리버스프록시 경유,
+          8000/8080 직접 접속 불가)
   방식  : HTTP POST, multipart/form-data
   타임아웃: 180초 (AI 서버가 무거움)
 
   A안 (현재): video 만 전송
   B안 (향후): video + drone_id(int) + anomaly_score(float)
-             → Jigsaw 모델 탑재 후 사용
 
 MODE 환경변수로 A/B 전환:
   UPLOAD_MODE = "A"  → 영상만
@@ -37,18 +37,6 @@ UPLOAD_MODE = os.environ.get("UPLOAD_MODE", "A")   # "A" 또는 "B"
 DRONE_ID = os.environ.get("DRONE_ID", "DR-01")    # B안에서 사용 (telemetry_sender의 DRONE_SYSID와 통일)
 MAX_RETRIES = 2
 RETRY_BACKOFF_SEC = 2
-
-
-def _h264_gstreamer_pipeline(path: str, w: int, h: int, fps: int) -> str:
-    """Jetson 하드웨어 인코더(nvv4l2h264enc)를 사용하는 GStreamer 저장 파이프라인."""
-    return (
-        f"appsrc ! "
-        f"video/x-raw,format=BGR,width={w},height={h},framerate={fps}/1 ! "
-        f"videoconvert ! video/x-raw,format=NV12 ! "
-        f"nvvidconv ! video/x-raw(memory:NVMM),format=NV12 ! "
-        f"nvv4l2h264enc bitrate=4000000 ! "
-        f"h264parse ! qtmux ! filesink location={path}"
-    )
 
 
 def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
@@ -79,6 +67,12 @@ def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
     try:
         for entry in frames:
             writer.write(entry.frame)
+    except Exception:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise
     finally:
         writer.release()
 
@@ -109,7 +103,7 @@ def _post_with_retry(path: str, anomaly_score: Optional[float]) -> bool:
                 files = {"video": (os.path.basename(path), f, "video/mp4")}
 
                 if UPLOAD_MODE.upper() == "B":
-                    # B안: Jigsaw 점수 + 드론ID 함께 전송
+                    # B안: anomaly_score + 드론ID 함께 전송
                     data = {
                         "drone_id": str(DRONE_ID),
                         "anomaly_score": str(anomaly_score if anomaly_score is not None else 0.0),
@@ -214,4 +208,3 @@ def upload_clip_sync(
                 os.remove(path)
             except Exception:
                 pass
-

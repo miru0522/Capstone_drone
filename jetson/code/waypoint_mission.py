@@ -5,6 +5,7 @@ PX4 Auto 모드 기반 Waypoint 자율비행 모듈.
 
 import asyncio
 import logging
+import math
 from typing import List, Dict, Any, Optional
 
 from mavsdk import System
@@ -20,24 +21,51 @@ MIN_SAFE_ALTITUDE_M = 20.0  # ★2026-08-21: 서버가 무엇을 주든 이 아�
 class WaypointMissionController:
     def __init__(self, system: System):
         self.system = system
+        self.current_mission_kind: Optional[str] = None
+        self.last_progress_current = 0
+        self.last_progress_total = 0
 
-    def _build_mission_items(self, waypoints, altitude=DEFAULT_ALTITUDE_M, speed=DEFAULT_SPEED_MS):
+    def _build_mission_items(
+        self,
+        waypoints,
+        altitude=DEFAULT_ALTITUDE_M,
+        speed=DEFAULT_SPEED_MS,
+        home_absolute_altitude_m=None,
+    ):
         items = []
         for wp in waypoints:
             # ★2026-08-21: 서버가 alt_agl(지면기준고도)을 지점별로 지정.
             # 안전 최소고도(20m) 하한을 여기서 강제 적용 - 서버가 20m
             # 미만 값을 주더라도(버그든 의도든) 절대 그 아래로 비행하지 않음.
-            requested_alt = wp.get("alt", altitude)
-            safe_alt = max(requested_alt, MIN_SAFE_ALTITUDE_M)
-            if safe_alt != requested_alt:
+            requested_agl = float(wp.get("alt_agl", wp.get("alt", altitude)))
+            ground_elevation = wp.get("ground_elevation_m")
+            safe_agl = max(requested_agl, MIN_SAFE_ALTITUDE_M)
+            if safe_agl != requested_agl:
                 logger.warning(
-                    f"고도 {requested_alt}m가 최소 안전고도({MIN_SAFE_ALTITUDE_M}m) 미만 "
-                    f"-> {safe_alt}m로 보정"
+                    f"AGL {requested_agl}m가 최소 안전고도({MIN_SAFE_ALTITUDE_M}m) 미만 "
+                    f"-> {safe_agl}m로 보정"
                 )
+
+            if ground_elevation is not None:
+                if home_absolute_altitude_m is None:
+                    raise ValueError("ground_elevation_m 경로에는 홈 절대고도가 필요함")
+                ground_elevation = float(ground_elevation)
+                relative_altitude = ground_elevation + safe_agl - home_absolute_altitude_m
+            else:
+                # 지면고도 데이터가 없으면 기존 계약처럼 홈 기준 상대고도로 취급한다.
+                relative_altitude = safe_agl
+
+            if not math.isfinite(relative_altitude) or relative_altitude <= 0.0:
+                raise ValueError(
+                    f"계산된 홈 기준 상대고도가 유효하지 않음: {relative_altitude}m"
+                )
+            if relative_altitude > 1000.0:
+                raise ValueError(f"계산된 홈 기준 상대고도가 비정상적으로 큼: {relative_altitude}m")
+
             item = MissionItem(
                 latitude_deg=wp["lat"],
                 longitude_deg=wp["lon"],
-                relative_altitude_m=safe_alt,
+                relative_altitude_m=relative_altitude,
                 speed_m_s=speed,
                 is_fly_through=True,
                 gimbal_pitch_deg=float("nan"),
@@ -53,17 +81,61 @@ class WaypointMissionController:
             items.append(item)
         return items
 
-    async def upload_and_start(self, waypoints, altitude=DEFAULT_ALTITUDE_M, speed=DEFAULT_SPEED_MS):
+    async def upload_and_start(
+        self,
+        waypoints,
+        altitude=DEFAULT_ALTITUDE_M,
+        speed=DEFAULT_SPEED_MS,
+        continue_check=None,
+        mission_kind="generic",
+    ):
         if not waypoints:
             logger.warning("빈 waypoint 리스트")
             return False
+
+        def can_continue():
+            return continue_check is None or bool(continue_check())
+
         try:
-            items = self._build_mission_items(waypoints, altitude, speed)
+            if not can_continue():
+                logger.warning("미션 업로드 전 명령이 취소됨")
+                return False
+            needs_home_altitude = any(
+                wp.get("ground_elevation_m") is not None for wp in waypoints
+            )
+            home_absolute_altitude_m = None
+            if needs_home_altitude:
+                logger.info("지면고도 경로 변환을 위해 홈 절대고도 조회 중...")
+                home = await asyncio.wait_for(
+                    self.system.telemetry.home().__anext__(), timeout=5.0
+                )
+                home_absolute_altitude_m = float(home.absolute_altitude_m)
+                if not math.isfinite(home_absolute_altitude_m):
+                    raise ValueError("홈 절대고도가 유효하지 않음")
+                if not can_continue():
+                    logger.warning("홈 고도 조회 후 명령이 취소됨")
+                    return False
+
+            items = self._build_mission_items(
+                waypoints,
+                altitude,
+                speed,
+                home_absolute_altitude_m=home_absolute_altitude_m,
+            )
             plan = MissionPlan(items)
             logger.info(f"미션 업로드 중... ({len(items)}개 waypoint)")
             await self.system.mission.upload_mission(plan)
+            self.current_mission_kind = mission_kind
+            self.last_progress_current = 0
+            self.last_progress_total = len(items)
             logger.info("미션 업로드 완료")
+            if not can_continue():
+                logger.warning("미션 업로드 후 명령이 취소됨 - arm/start 생략")
+                return False
             async for is_armed in self.system.telemetry.armed():
+                if not can_continue():
+                    logger.warning("arm 전 명령이 취소됨")
+                    return False
                 if not is_armed:
                     logger.info("드론 무장 중...")
                     await self.system.action.arm()
@@ -73,12 +145,18 @@ class WaypointMissionController:
             # PX4 요구사항: 미션 시작 전 명시적 이륙 필요
             # (STATUSTEXT 확인: "Auto: Missing Takeoff Cmd" 로 실기 검증됨)
             async for in_air in self.system.telemetry.in_air():
+                if not can_continue():
+                    logger.warning("이륙 전 명령이 취소됨")
+                    return False
                 if not in_air:
                     logger.info("이륙 중... (미션 시작 전 필수)")
                     await self.system.action.takeoff()
                     await asyncio.sleep(8.0)  # 이륙고도 도달 대기
                 break
 
+            if not can_continue():
+                logger.warning("미션 시작 전 명령이 취소됨")
+                return False
             logger.info("미션 시작 (PX4 Auto 모드)")
             await self.system.mission.start_mission()
             return True
@@ -90,15 +168,19 @@ class WaypointMissionController:
         try:
             await self.system.mission.pause_mission()
             logger.info("미션 일시정지")
+            return True
         except Exception as e:
             logger.error(f"미션 일시정지 실패: {e}")
+            return False
 
     async def resume_mission(self):
         try:
             await self.system.mission.start_mission()
             logger.info("미션 재개")
+            return True
         except Exception as e:
             logger.error(f"미션 재개 실패: {e}")
+            return False
 
     async def clear_mission(self):
         try:
@@ -126,12 +208,15 @@ class WaypointMissionController:
         """
         try:
             async for progress in self.system.mission.mission_progress():
+                self.last_progress_current = int(progress.current)
+                self.last_progress_total = int(progress.total)
                 if progress.total > 0 and progress.current >= progress.total:
                     logger.info("🏁 미션 완주 감지 (mission_progress)")
                     try:
                         await self.system.action.hold()
                     except Exception as e:
                         logger.warning(f"완주 후 hold() 실패: {e}")
+                        return
                     on_complete()
                     return
         except asyncio.CancelledError:
@@ -171,6 +256,7 @@ class WaypointMissionController:
                         await self.system.action.hold()
                     except Exception as e:
                         logger.warning(f"도착 후 hold() 실패: {e}")
+                        return
                     on_arrival()
                     return
         except asyncio.CancelledError:

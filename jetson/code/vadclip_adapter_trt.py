@@ -1,7 +1,6 @@
-# TRT V4 COPY — original vadclip_adapter.py unchanged
 """
-vadclip_adapter.py
-Jetson live camera frame window -> VadCLIP t1 anomaly score adapter.
+vadclip_adapter_trt.py
+Jetson live camera frame window -> VadCLIP t1 anomaly score adapter (TensorRT CLIP visual encoder).
 
 This module extracts only the production path already validated in
 90_edge_runtime_jetson_v2.py:
@@ -36,7 +35,7 @@ from ring_buffer import (
     VADCLIP_STRIDE,
 )
 
-logger = logging.getLogger("vadclip_adapter")
+logger = logging.getLogger("vadclip_adapter_trt")
 
 # Official VadCLIP UCF-Crime model configuration.
 CLASSES_NUM = 14
@@ -194,53 +193,6 @@ class _VadCLIPHead:
                 feats = feats[0]
             logits = self.model.classifier(feats + self.model.mlp2(feats))
             return torch.sigmoid(logits).squeeze().float().cpu().numpy().ravel()
-
-
-class _ClipFeatureExtractor:
-    """Official crop-5 + official CLIP preprocessing on BGR frames."""
-
-    def __init__(self, repo: Path, clip_model: Path, device: str, crop_index: int):
-        import torch
-        from PIL import Image
-
-        _prepend_repo_paths(repo)
-        clip_pkg = importlib.import_module("clip")
-
-        self.torch = torch
-        self.Image = Image
-        self.device = device
-        self.crop_index = crop_index
-        self.model, self.preprocess = clip_pkg.load(str(clip_model), device=device)
-        self.model.eval()
-        self.image_crop = _resolve_symbol("image_crop")
-
-        logger.info(
-            "CLIP image encoder loaded: %s, crop_index=%d",
-            clip_model,
-            crop_index,
-        )
-
-    def _crop(self, frame_bgr: np.ndarray):
-        # IMPORTANT: image_crop performs BGR->RGB internally. Do not pre-swap.
-        out = self.image_crop(frame_bgr, self.crop_index)
-        if isinstance(out, self.Image.Image):
-            return out
-        arr = np.asarray(out)
-        if arr.dtype != np.uint8:
-            arr = np.clip(arr * 255 if arr.max() <= 1.0 else arr, 0, 255).astype(np.uint8)
-        return self.Image.fromarray(arr)
-
-    def encode_bgr(self, frames_bgr: Iterable[np.ndarray]) -> np.ndarray:
-        torch = self.torch
-        tensors = [self.preprocess(self._crop(frame)) for frame in frames_bgr]
-        if not tensors:
-            return np.zeros((0, EMBED_DIM), dtype=np.float32)
-        x = torch.stack(tensors).to(self.device)
-        if next(self.model.parameters()).dtype == torch.float16:
-            x = x.half()
-        with torch.no_grad():
-            out = self.model.encode_image(x)
-        return out.float().cpu().numpy().astype(np.float32)
 
 
 class _TensorRTClipFeatureExtractor:
@@ -569,10 +521,14 @@ class VadCLIPScorer:
                 f"CLIP feature shape mismatch: {feats.shape}, "
                 f"expected ({VADCLIP_SNIPPETS_PER_WINDOW},{EMBED_DIM})"
             )
+        if not np.isfinite(feats).all():
+            raise RuntimeError("CLIP feature contains NaN or Inf")
 
         self.feature_buffer.push(feats)
         x, valid_len = self.feature_buffer.as_input()
         prob1 = self.head.prob1(x, valid_len)
+        if not np.isfinite(prob1).all():
+            raise RuntimeError("VadCLIP probability contains NaN or Inf")
 
         n = min(valid_len, len(prob1))
         lo = max(0, n - VADCLIP_SNIPPETS_PER_WINDOW)
@@ -581,4 +537,6 @@ class VadCLIPScorer:
             return 0.0
         ordered = np.sort(seg)[::-1]
         score = float(ordered[: min(self.topk, ordered.size)].mean())
+        if not np.isfinite(score):
+            raise RuntimeError(f"VadCLIP score is not finite: {score}")
         return max(0.0, min(1.0, score))

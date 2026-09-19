@@ -1,4 +1,3 @@
-# TRT V6 MEMORY-SAFE ASYNC-UPLOAD COPY — original main.py/v4/v5 unchanged
 """
 main.py
 CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 호버링
@@ -7,10 +6,12 @@ CSI 카메라(GStreamer) -> RingBuffer -> 추론 -> 트리거 -> 영상전송 + 
   1. MAVSDK action.hold() 로 즉시 호버링 (제자리 정지)
   2. 영상을 서버(/analyze-video)로 전송
   3. 호버링 상태 유지 (재개는 command_receiver.py가 STOMP로 받는
-     별도 명령으로 처리 예정 - 아직 서버와 재개 명령 형식 미정)
+     RESUME_PATROL 등 명령으로 처리 - command_receiver.py의
+     DroneCommandHandler._resume_patrol() 참고)
 
-Edge 이상탐지는 VadCLIP으로 동작한다. 기존 Jigsaw-VAD/WideBranchNet은
-Git 기준본으로 롤백 가능하며, downstream 트리거/전송/호버링 인터페이스는 유지한다.
+Edge 이상탐지는 VadCLIP(TensorRT, V6 비동기 업로드 구조)으로 동작한다.
+기존 Jigsaw-VAD/WideBranchNet은 Git 기준본(c387b52)으로 롤백 가능하며,
+downstream 트리거/전송/호버링 인터페이스는 유지한다.
 """
 
 import os
@@ -18,26 +19,25 @@ import time
 import logging
 import signal
 import sys
-import asyncio
 import threading
 import queue
+import uuid
 from typing import Optional
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import cv2
 import numpy as np
 import requests
-from mavsdk import System
-
 from ring_buffer import RingBuffer, FrameEntry, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
-from uploader import upload_clip_async, upload_clip_sync
+from uploader import upload_clip_sync
 from anomaly_model_trt import AnomalyPipeline
+from state_store import atomic_write_json, read_json, update_json
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("main_v4_trt")
+logger = logging.getLogger("main")
 
 # V6: live CSI / VadCLIP input resolution is unchanged.
 # Only the anomaly clip queued to the upload worker is reduced.
@@ -74,6 +74,13 @@ STREAM_REQUEST_STATE_PATH = os.environ.get("STREAM_REQUEST_STATE_PATH", "/tmp/dr
 # 데모/리허설 전용: 카메라 대신 지정된 영상을 일정 시간 캡처 루프에 주입한다.
 # 운영 중 신호파일이 없으면 TestVideoInjector는 완전히 비활성(오버헤드 없음).
 TEST_INJECT_STATE_PATH = os.environ.get("TEST_INJECT_STATE_PATH", "/tmp/drone_test_inject.json")
+TEST_INJECT_REQUEST_TTL_SEC = float(os.environ.get("TEST_INJECT_REQUEST_TTL_SEC", "60"))
+TEST_INJECT_MAX_DURATION_SEC = float(os.environ.get("TEST_INJECT_MAX_DURATION_SEC", "60"))
+
+# 이상 감지 호버 요청은 비행 상태의 단일 소유자인 command_receiver.py가 처리한다.
+ANOMALY_HOLD_STATE_PATH = os.environ.get(
+    "ANOMALY_HOLD_STATE_PATH", "/tmp/drone_anomaly_hold.json"
+)
 
 # ★2026-08-21 서버 확정 스펙: 영상은 STOMP가 아니라 HTTP로 전송.
 # (STOMP에 영상을 얹으면 EMERGENCY_STOP 등 제어명령이 영상 프레임
@@ -82,7 +89,6 @@ SERVER_HOST = os.environ.get("SERVER_URL", "http://203.249.90.3:8031")
 DEVICE_KEY = os.environ.get("DEVICE_KEY", "HPC-2026")
 STREAM_FRAME_TIMEOUT_SEC = 5.0     # 프레임 1장 업로드 타임아웃
 STREAM_NO_RESPONSE_LIMIT_SEC = 10.0  # 이 시간 무응답이면 자체 중지 (서버 확정 스펙)
-MAVSDK_URI = "serial:///dev/pixhawk:115200"
 
 
 def create_gstreamer_pipeline(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, fps=FPS) -> str:
@@ -146,60 +152,38 @@ def detect_anomaly(window: np.ndarray) -> float:
 
 class DroneHoverController:
     """
-    MAVSDK 연결 + 호버링 전담. 별도 스레드에서 asyncio 이벤트 루프 실행.
-    main 캡처 루프(동기)에서 hover_now() 호출 시 스레드 안전하게 처리.
+    이상 감지 호버 요청 전달기.
+
+    실제 MAVSDK hold와 비행 상태 변경은 command_receiver.py만 수행한다.
+    두 프로세스가 독립적으로 비행 모드를 바꾸면서 상태가 어긋나는 문제를 막기
+    위해 main.py는 요청 ID가 포함된 로컬 상태 파일만 원자적으로 기록한다.
     """
 
     def __init__(self):
-        self.system: Optional[System] = None
-        self.loop: Optional[asyncio.AbstractEventLoop] = None
-        self._ready = threading.Event()
-        self._is_hovering = False
+        self._last_request_id: Optional[str] = None
 
     def start(self):
-        """백그라운드 스레드에서 asyncio 루프 + MAVSDK 연결 시작."""
-        t = threading.Thread(target=self._run_loop, daemon=True)
-        t.start()
-        self._ready.wait(timeout=15.0)
-
-    def _run_loop(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-        self.loop.run_until_complete(self._connect())
-        self._ready.set()
-        self.loop.run_forever()
-
-    async def _connect(self):
-        try:
-            # 공유 mavsdk_server(포트 50051)에 접속 - 시리얼 포트 독점 문제 해결
-            self.system = System(mavsdk_server_address="localhost", port=50051)
-            logger.info("[Hover] 공유 mavsdk_server(localhost:50051)에 연결 시도")
-            await self.system.connect()
-            await asyncio.sleep(2.0)
-            logger.info("[Hover] ✅ 드론 연결 성공")
-        except Exception as e:
-            logger.error(f"[Hover] ❌ 드론 연결 실패: {e}")
-            self.system = None
-
-    async def _hold(self):
-        try:
-            await self.system.action.hold()
-            self._is_hovering = True
-            logger.info("[Hover] 🛑 호버링 실행 (action.hold)")
-        except Exception as e:
-            logger.error(f"[Hover] ❌ 호버링 실패: {e}")
+        logger.info("[Hover] command_receiver 호버 요청 채널 준비")
 
     def hover_now(self):
-        """동기 캡처 루프에서 호출. 호버링 코루틴을 asyncio 루프에 제출."""
-        if not self.system or not self.loop:
-            logger.warning("[Hover] 드론 미연결 상태 - 호버링 스킵")
-            return
-        if self._is_hovering:
-            return  # 이미 호버링 중이면 중복 호출 방지
-        asyncio.run_coroutine_threadsafe(self._hold(), self.loop)
+        """command_receiver가 소비할 고유 호버 요청을 원자적으로 기록한다."""
+        request_id = uuid.uuid4().hex
+        atomic_write_json(ANOMALY_HOLD_STATE_PATH, {
+            "request_id": request_id,
+            "requested_at": time.time(),
+            "status": "requested",
+            "source": "vadclip",
+        })
+        self._last_request_id = request_id
+        logger.warning(f"[Hover] 이상 감지 호버 요청 제출 (requestId={request_id})")
 
     def is_hovering(self) -> bool:
-        return self._is_hovering
+        state = read_json(ANOMALY_HOLD_STATE_PATH, {})
+        return bool(
+            isinstance(state, dict)
+            and state.get("request_id") == self._last_request_id
+            and state.get("status") == "succeeded"
+        )
 
 
 def _is_stream_requested() -> bool:
@@ -331,14 +315,46 @@ class StreamUploader:
         self._running = False
 
     def _read_stream_state(self) -> Optional[dict]:
+        state = read_json(STREAM_REQUEST_STATE_PATH, None)
+        if not isinstance(state, dict):
+            return None
+        if not state.get("stream_enabled"):
+            return state
         try:
-            import json as _json
-            with open(STREAM_REQUEST_STATE_PATH, "r") as f:
-                return _json.load(f)
-        except Exception:
+            stream_id = state.get("stream_id")
+            upload_path = state.get("upload_path")
+            width = int(state.get("width"))
+            height = int(state.get("height"))
+            quality = int(state.get("quality"))
+            fps = float(state.get("fps"))
+            if not isinstance(stream_id, str) or not stream_id.strip():
+                raise ValueError("stream_id 누락")
+            if (
+                not isinstance(upload_path, str)
+                or not upload_path.startswith("/")
+                or upload_path.startswith("//")
+            ):
+                raise ValueError("upload_path 오류")
+            if not 160 <= width <= 1920 or not 120 <= height <= 1080:
+                raise ValueError("해상도 범위 오류")
+            if not 20 <= quality <= 95 or not np.isfinite(fps) or not 1.0 <= fps <= 30.0:
+                raise ValueError("quality/fps 범위 오류")
+            state.update({
+                "width": width,
+                "height": height,
+                "quality": quality,
+                "fps": fps,
+            })
+            return state
+        except (TypeError, ValueError) as e:
+            logger.warning(f"[StreamUpload] 잘못된 스트림 상태 무시: {e}")
             return None
 
-    def _disable_stream_state(self, reason: str) -> None:
+    def _disable_stream_state(
+        self,
+        reason: str,
+        expected_stream_id: Optional[str] = None,
+    ) -> None:
         """서버가 중지를 지시했을 때 신호파일의 stream_enabled 도 내린다.
 
         메모리 변수(active)만 내리면 _loop 가 1초 뒤 신호파일을 다시 읽어
@@ -348,12 +364,28 @@ class StreamUploader:
         10초 무응답 자체중지 안전망까지 무력해진다.
         """
         try:
-            import json as _json
-            state = self._read_stream_state() or {}
-            state["stream_enabled"] = False
-            state["disabled_reason"] = reason
-            with open(STREAM_REQUEST_STATE_PATH, "w") as f:
-                _json.dump(state, f)
+            def disable_if_current(current):
+                state = dict(current) if isinstance(current, dict) else {}
+                current_stream_id = state.get("stream_id")
+                if (
+                    expected_stream_id is not None
+                    and current_stream_id != expected_stream_id
+                ):
+                    return None
+                state["stream_enabled"] = False
+                state["disabled_reason"] = reason
+                state["disabled_at"] = time.time()
+                return state
+
+            updated = update_json(
+                STREAM_REQUEST_STATE_PATH, disable_if_current, default={}
+            )
+            if updated is None:
+                logger.info(
+                    "[StreamUpload] 이전 세션의 중지 응답 무시 "
+                    f"(응답={expected_stream_id})"
+                )
+                return
             logger.info(f"[StreamUpload] 신호파일 stream_enabled=false 기록 ({reason})")
         except Exception as e:
             logger.warning(f"[StreamUpload] 신호파일 중지 기록 실패: {e}")
@@ -389,7 +421,7 @@ class StreamUploader:
                     f"[StreamUpload] {STREAM_NO_RESPONSE_LIMIT_SEC}초 무응답 - 스스로 중지"
                 )
                 active = False
-                self._disable_stream_state("no_response")
+                self._disable_stream_state("no_response", state.get("stream_id"))
                 continue
 
             frame = self.pipeline_ref.latest_frame_for_stream
@@ -434,11 +466,11 @@ class StreamUploader:
                 elif resp.status_code == 410:
                     logger.info("[StreamUpload] 서버 410 Gone - 즉시 중지")
                     active = False
-                    self._disable_stream_state("410")
+                    self._disable_stream_state("410", stream_id)
                 elif resp.status_code == 401:
                     logger.error("[StreamUpload] 401 Unauthorized (디바이스 키 문제) - 중지")
                     active = False
-                    self._disable_stream_state("401")
+                    self._disable_stream_state("401", stream_id)
                 else:
                     logger.warning(f"[StreamUpload] 예상 밖 응답 {resp.status_code}")
                     last_response_time = time.time()  # 서버가 응답은 했으니 무응답 타이머는 리셋
@@ -469,47 +501,138 @@ class TestVideoInjector:
 
     def __init__(self):
         self._cap: Optional[cv2.VideoCapture] = None
+        self._src_fps: float = 0.0
+        self._src_frame_count: int = 0
+        self._play_tick: int = 0
+        self._current_src_index: int = 0
         self._end_time: float = 0.0
-        self._consumed_at: Optional[float] = None
+        self._request_id: Optional[str] = None
         self._last_check: float = 0.0
+
+    def _close_video(self) -> None:
+        if self._cap is not None:
+            self._cap.release()
+        self._cap = None
+        self._src_fps = 0.0
+        self._src_frame_count = 0
+        self._play_tick = 0
+        self._current_src_index = 0
+
+    def _mark_request(self, req: dict, status: str, **extra) -> None:
+        updated = dict(req)
+        updated["status"] = status
+        updated["consumed_at"] = time.time()
+        updated.update(extra)
+        atomic_write_json(TEST_INJECT_STATE_PATH, updated)
+
+    def _open_video(self, video_path: str) -> bool:
+        self._close_video()
+        cap = cv2.VideoCapture(video_path)
+        if not cap.isOpened():
+            cap.release()
+            return False
+        src_fps = float(cap.get(cv2.CAP_PROP_FPS))
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if not np.isfinite(src_fps) or src_fps <= 0.0 or frame_count <= 0:
+            cap.release()
+            return False
+        self._cap = cap
+        self._src_fps = src_fps
+        self._src_frame_count = frame_count
+        self._play_tick = 0
+        self._current_src_index = 0
+        return True
 
     def _check_new_request(self, now: float) -> None:
         if now - self._last_check < 1.0:
             return
         self._last_check = now
-        try:
-            import json as _json
-            with open(TEST_INJECT_STATE_PATH, "r") as f:
-                req = _json.load(f)
-        except Exception:
+        req = read_json(TEST_INJECT_STATE_PATH, None)
+        if not isinstance(req, dict):
             return
 
         requested_at = req.get("requested_at")
-        if requested_at is None or requested_at == self._consumed_at:
+        request_id = str(req.get("request_id") or requested_at or "")
+        if not request_id or request_id == self._request_id or req.get("consumed_at"):
+            return
+
+        try:
+            requested_at = float(requested_at)
+            duration = float(req.get("duration_sec", 15))
+        except (TypeError, ValueError):
+            self._request_id = request_id
+            self._mark_request(req, "rejected", error="invalid numeric field")
+            logger.warning("[TestInject] requested_at/duration_sec 형식 오류")
+            return
+
+        if not np.isfinite(requested_at) or not np.isfinite(duration):
+            self._request_id = request_id
+            self._mark_request(req, "rejected", error="non-finite numeric field")
+            logger.warning("[TestInject] requested_at/duration_sec가 유한하지 않음")
+            return
+        if now - requested_at > TEST_INJECT_REQUEST_TTL_SEC:
+            self._request_id = request_id
+            self._mark_request(req, "expired")
+            logger.warning("[TestInject] 만료된 요청을 실행하지 않음")
+            return
+        if duration <= 0.0 or duration > TEST_INJECT_MAX_DURATION_SEC:
+            self._request_id = request_id
+            self._mark_request(req, "rejected", error="duration out of range")
+            logger.warning(f"[TestInject] duration_sec 범위 오류: {duration}")
             return
 
         video_path = req.get("video_path")
-        duration = float(req.get("duration_sec", 15))
         if not video_path or not os.path.exists(video_path):
             logger.warning(f"[TestInject] 영상 경로 없음/찾을 수 없음: {video_path}")
-            self._consumed_at = requested_at
+            self._request_id = request_id
+            self._mark_request(req, "rejected", error="video not found")
             return
 
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            logger.warning(f"[TestInject] 영상 열기 실패: {video_path}")
-            self._consumed_at = requested_at
+        # 재시작 뒤 같은 요청이 다시 실행되지 않도록 영상 로드 전에 소비 처리한다.
+        self._request_id = request_id
+        self._mark_request(req, "loading")
+        if not self._open_video(video_path):
+            logger.warning(f"[TestInject] 영상 로드 실패/빈 영상: {video_path}")
+            self._mark_request(req, "failed", error="cannot open video")
             return
 
-        if self._cap is not None:
-            self._cap.release()
-        self._cap = cap
-        self._end_time = now + duration
-        self._consumed_at = requested_at
+        # 준비에 걸린 시간은 실제 주입 duration에 포함하지 않는다.
+        self._end_time = time.time() + duration
+        self._mark_request(req, "active")
         logger.warning(
             f"[TestInject] \u26a0\ufe0f 테스트 모드 진입: {duration:.0f}초간 카메라 대신 "
-            f"'{video_path}' 프레임을 주입합니다 (실제 카메라 입력 아님)"
+            f"'{video_path}' 프레임을 주입합니다 (실제 카메라 입력 아님, "
+            f"원본 fps={self._src_fps:.2f})"
         )
+
+    def _read_next_frame(self):
+        if self._cap is None:
+            return None
+
+        desired_index = int(round(self._play_tick * self._src_fps / FPS))
+        desired_index %= self._src_frame_count
+        self._play_tick += 1
+
+        if desired_index < self._current_src_index:
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            self._current_src_index = 0
+
+        frame = None
+        while self._current_src_index <= desired_index:
+            ret, frame = self._cap.read()
+            if not ret:
+                self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                self._current_src_index = 0
+                ret, frame = self._cap.read()
+                if not ret:
+                    return None
+            self._current_src_index += 1
+
+        if frame.shape[1] != CAMERA_WIDTH or frame.shape[0] != CAMERA_HEIGHT:
+            frame = cv2.resize(
+                frame, (CAMERA_WIDTH, CAMERA_HEIGHT), interpolation=cv2.INTER_AREA
+            )
+        return frame
 
     def maybe_get_frame(self):
         """활성 상태면 (True, frame)을, 아니면 (False, None)을 반환한다."""
@@ -521,20 +644,14 @@ class TestVideoInjector:
 
         if now >= self._end_time:
             logger.warning("[TestInject] 테스트 모드 종료 - 실제 카메라로 복귀")
-            self._cap.release()
-            self._cap = None
+            self._close_video()
             return False, None
 
-        ret, frame = self._cap.read()
-        if not ret:
-            # 영상이 끝나면 처음부터 반복 재생 (duration 다 찰 때까지)
-            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-            ret, frame = self._cap.read()
-            if not ret:
-                logger.warning("[TestInject] 영상 재생 실패 - 실제 카메라로 복귀")
-                self._cap.release()
-                self._cap = None
-                return False, None
+        frame = self._read_next_frame()
+        if frame is None:
+            logger.warning("[TestInject] 영상 프레임 읽기 실패 - 실제 카메라로 복귀")
+            self._close_video()
+            return False, None
         return True, frame
 
 
@@ -638,10 +755,24 @@ class CameraAnomalyPipeline:
         logger.info(f"⚠️ 이상 감지 트리거 발생 (score={score:.3f})")
         self.hover.hover_now()
 
-        # V6: long-lived upload job에는 reduced snapshot만 보낸다.
-        # live ring과 VadCLIP 입력 해상도는 그대로 유지된다.
-        snapshot = self._make_upload_snapshot()
-        submitted = self._submit_upload(snapshot, score)
+        # 업로드 슬롯을 먼저 확보해야 busy 상태에서 큰 snapshot을 만들지 않는다.
+        if not self._reserve_upload():
+            logger.warning(
+                "이미 clip 업로드가 진행 중이므로 중복 전송 생략; "
+                "VadCLIP inference는 계속 동작"
+            )
+            return
+
+        try:
+            # V6: long-lived upload job에는 reduced snapshot만 보낸다.
+            # live ring과 VadCLIP 입력 해상도는 그대로 유지된다.
+            snapshot = self._make_upload_snapshot()
+            self._upload_queue.put_nowait((snapshot, score))
+            submitted = True
+        except Exception:
+            self._upload_busy.clear()
+            logger.exception("영상 전송 job 준비 실패")
+            submitted = False
 
         if submitted:
             logger.info(
@@ -656,11 +787,16 @@ class CameraAnomalyPipeline:
 
         logger.info("[Hover] 호버링 유지 중 - 관제사 명령 무한 대기 (command_receiver.py 경유)")
 
-    def _submit_upload(self, snapshot, score: float) -> bool:
+    def _reserve_upload(self) -> bool:
         if self._upload_busy.is_set():
             return False
-
         self._upload_busy.set()
+        return True
+
+    def _submit_upload(self, snapshot, score: float) -> bool:
+        """시험/호환용 직접 제출 경로. 운영 트리거는 먼저 슬롯을 예약한다."""
+        if not self._reserve_upload():
+            return False
         try:
             self._upload_queue.put_nowait((snapshot, score))
             return True
@@ -689,8 +825,10 @@ class CameraAnomalyPipeline:
             except Exception:
                 logger.exception("clip upload worker 예외")
             finally:
-                self._upload_busy.clear()
                 self._upload_queue.task_done()
+                snapshot = None
+                score = None
+                self._upload_busy.clear()
 
     def _inference_loop(self) -> None:
         logger.info("VadCLIP 추론 worker 시작")
