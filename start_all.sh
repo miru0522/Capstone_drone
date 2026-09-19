@@ -1,22 +1,8 @@
 #!/bin/bash
-# start_all.sh
-# 젯슨 부팅 후 드론 통합 파이프라인 전체 실행 스크립트
-#
-# 실행 순서:
-#   1. mavsdk_server (시리얼 포트 독점, gRPC 50051 오픈)
-#   2. telemetry_sender.py (위치/배터리 서버 전송)
-#   3. command_receiver.py (STOMP 명령 수신 + 드론 제어)
-#   4. main.py (카메라+추론+호버링)
-#
-# 로그는 각각 logs/*.log 로 분리 저장. PID는 logs/*.pid 에 저장.
-# 종료는 stop_all.sh 사용.
-
-set -e
+# 젯슨 부팅 후 드론 통합 파이프라인 전체 실행 스크립트.
+set -eu
 cd "$(dirname "$0")"
 
-# ★2026-08-26: DEVICE_KEY 기본값 지정 (STOMP CONNECT X-Device-Key /
-# 스트리밍 업로드 인증에 사용됨). 이미 환경변수로 넘어온 값이 있으면
-# 그걸 우선한다 - 여기서는 비어있을 때만 기본값을 채운다.
 export DEVICE_KEY="${DEVICE_KEY:-HPC-2026}"
 
 MAVSDK_SERVER_BIN="/usr/local/lib/python3.8/dist-packages/mavsdk/bin/mavsdk_server"
@@ -25,53 +11,57 @@ GRPC_PORT="50051"
 
 mkdir -p logs
 
+rotate_log() {
+    log_path="$1"
+    if [ -f "$log_path" ]; then
+        cp "$log_path" "${log_path}.bak_$(date '+%Y%m%d_%H%M%S')"
+    fi
+}
+
+check_started() {
+    name="$1"
+    pid_file="logs/${name}.pid"
+    sleep "$2"
+    if ! kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+        echo "오류: ${name} 시작 실패. logs/${name}.log 확인" >&2
+        exit 1
+    fi
+    echo "  완료: ${name} 실행 중 (PID: $(cat "$pid_file"))"
+}
+
 echo "=================================================="
-echo " 드론 통합 파이프라인 시작 $(date '+%Y-%m-%d %H:%M:%S')"
+echo "드론 통합 파이프라인 시작 $(date '+%Y-%m-%d %H:%M:%S')"
 echo "=================================================="
 
-# ── 0. 기존 실행중인 프로세스 정리 ─────────────────────
-echo "[0/4] 기존 프로세스 정리 중..."
-pkill -f "mavsdk_server" 2>/dev/null || true
-pkill -f "telemetry_sender.py" 2>/dev/null || true
-pkill -f "command_receiver.py" 2>/dev/null || true
-pkill -f "main.py" 2>/dev/null || true
-sleep 2
+echo "[0/4] 기존 PID 검증 후 종료 중..."
+./stop_all.sh
 
-# ── 1. mavsdk_server 시작 (시리얼 포트 독점) ────────────
-echo "[1/4] mavsdk_server 시작 중... ($SERIAL_PORT -> gRPC:$GRPC_PORT)"
+echo "[1/4] mavsdk_server 시작 ($SERIAL_PORT -> gRPC:$GRPC_PORT)"
+rotate_log logs/mavsdk_server.log
 nohup "$MAVSDK_SERVER_BIN" -p "$GRPC_PORT" "serial://${SERIAL_PORT}:115200" \
     > logs/mavsdk_server.log 2>&1 &
 echo $! > logs/mavsdk_server.pid
-sleep 5   # Pixhawk 디스커버리 대기
+check_started mavsdk_server 5
 
-if ! kill -0 "$(cat logs/mavsdk_server.pid)" 2>/dev/null; then
-    echo "❌ mavsdk_server 시작 실패! logs/mavsdk_server.log 확인 필요"
-    exit 1
-fi
-echo "    ✅ mavsdk_server 실행 중 (PID: $(cat logs/mavsdk_server.pid))"
-
-# ── 2. telemetry_sender.py ──────────────────────────────
-echo "[2/4] telemetry_sender.py 시작 중..."
+echo "[2/4] telemetry_sender.py 시작"
+rotate_log logs/telemetry_sender.log
 nohup python3 telemetry_sender.py > logs/telemetry_sender.log 2>&1 &
 echo $! > logs/telemetry_sender.pid
-sleep 2
-echo "    ✅ telemetry_sender 실행 중 (PID: $(cat logs/telemetry_sender.pid))"
+check_started telemetry_sender 2
 
-# ── 3. command_receiver.py ──────────────────────────────
-echo "[3/4] command_receiver.py 시작 중..."
+echo "[3/4] command_receiver.py 시작"
+rotate_log logs/command_receiver.log
 nohup python3 command_receiver.py > logs/command_receiver.log 2>&1 &
 echo $! > logs/command_receiver.pid
-sleep 3
-echo "    ✅ command_receiver 실행 중 (PID: $(cat logs/command_receiver.pid))"
+check_started command_receiver 3
 
-# ── 4. main.py (카메라+추론+호버링) ─────────────────────
-echo "[4/4] main.py 시작 중..."
+echo "[4/4] main.py 시작"
+rotate_log logs/main.log
 nohup python3 main.py > logs/main.log 2>&1 &
 echo $! > logs/main.pid
-sleep 2
-echo "    ✅ main.py 실행 중 (PID: $(cat logs/main.pid))"
+check_started main 2
 
 echo "=================================================="
-echo " 전체 실행 완료. 로그 확인: tail -f logs/*.log"
-echo " 종료하려면: ./stop_all.sh"
+echo "전체 실행 완료. 로그: logs/*.log"
+echo "개별 재기동: ./restart_component.sh <이름>"
 echo "=================================================="
