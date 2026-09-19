@@ -62,10 +62,12 @@ PLAY_AUDIO에 eventId 포함(2026-08-17 신규) -> 재생완료 후
 import os
 import json
 import time
+import math
 import base64
 import tempfile
 import subprocess
 import asyncio
+import concurrent.futures
 import logging
 import threading
 from urllib.parse import urlparse
@@ -77,8 +79,10 @@ import requests
 from mavsdk import System
 
 from waypoint_mission import WaypointMissionController
+from state_store import atomic_write_json, read_json
+from battery_utils import BatteryPercentNormalizer
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger("command_receiver")
 
 # ─── 서버/드론 식별 설정 ────────────────────────────────────────
@@ -96,6 +100,7 @@ EMERGENCY_STOP_TIMEOUT_SEC = 5.0   # EMERGENCY_STOP(진짜 kill)용 - 최대한 
 
 # ★2026-08-21: 배터리 자율복귀 페일세이프 (서버 경고 60%, 드론 자율복귀 40%)
 BATTERY_RTL_THRESHOLD_PERCENT = float(os.environ.get("BATTERY_RTL_THRESHOLD", "40.0"))
+BATTERY_RTL_RETRY_SEC = float(os.environ.get("BATTERY_RTL_RETRY_SEC", "60.0"))
 STATION_ARRIVAL_RADIUS_M = 5.0
 
 parsed = urlparse(SERVER_URL)
@@ -130,6 +135,12 @@ STATUS_STATE_PATH = os.environ.get("STATUS_STATE_PATH", "/tmp/drone_status_state
 # main.py(카메라 프로세스)가 별도로 이 파일을 주기적으로 읽어
 # MJPEG 스트리밍 서버를 켜고 끈다 (프로세스가 분리되어 있어 파일로 신호전달)
 STREAM_REQUEST_STATE_PATH = os.environ.get("STREAM_REQUEST_STATE_PATH", "/tmp/drone_stream_request.json")
+ANOMALY_HOLD_STATE_PATH = os.environ.get(
+    "ANOMALY_HOLD_STATE_PATH", "/tmp/drone_anomaly_hold.json"
+)
+ANOMALY_HOLD_REQUEST_TTL_SEC = float(
+    os.environ.get("ANOMALY_HOLD_REQUEST_TTL_SEC", "10")
+)
 
 # ★2026-08-21 서버 확정 스펙: 프레임은 HTTP(POST /drones/{droneId}/stream/frame)로
 # 원본 JPEG 바이너리 전송(base64 아님). REQUEST_STREAM이 값을 안 주면 아래 기본값 사용.
@@ -193,6 +204,18 @@ class DroneCommandHandler:
         self._status: str = "IDLE"  # IDLE/PATROLLING/PAUSED/RETURNING/LANDING (텔레메트리 status와 동기화용)
         self._watch_task: Optional[asyncio.Task] = None  # 완주/도착 감지 백그라운드 태스크
         self._battery_rtl_triggered: bool = False  # 배터리 자율복귀 중복트리거 방지 플래그 (SET_ROUTE 정의 이후 사용)
+        self._current_action: Optional[str] = None
+        self._command_generation = 0
+        self._active_command_future = None
+        self._command_lock = threading.Lock()
+        self._battery_normalizer = BatteryPercentNormalizer()
+        self._latest_battery_percent: Optional[float] = None
+        self._battery_rtl_last_attempt = 0.0
+        self._last_anomaly_hold_request_id: Optional[str] = None
+        self._route_version = 0
+        self._loaded_patrol_route_version: Optional[int] = None
+        self._patrol_resume_index = 0
+        self._patrol_mission_base_index = 0
 
     async def connect(self):
         self.system = System(mavsdk_server_address="localhost", port=50051)
@@ -201,6 +224,33 @@ class DroneCommandHandler:
         await asyncio.sleep(2.0)
         self.mission = WaypointMissionController(self.system)
         logger.info("✅ 드론 연결 성공")
+
+    async def recover_initial_state(self):
+        """프로세스 재시작 시 실제 armed/in_air를 읽어 초기 상태를 복구한다."""
+        try:
+            armed, in_air = await asyncio.gather(
+                asyncio.wait_for(self.system.telemetry.armed().__anext__(), timeout=5.0),
+                asyncio.wait_for(self.system.telemetry.in_air().__anext__(), timeout=5.0),
+            )
+            if not armed and not in_air:
+                self._status = "IDLE"
+                current_action = None
+            elif in_air:
+                self._status = "PAUSED"
+                current_action = "PROCESS_RESTART_RECOVERY"
+            else:
+                self._status = "PAUSED"
+                current_action = "ARMED_GROUND_RECOVERY"
+            self._write_status_state(current_action=current_action)
+            logger.warning(
+                "재시작 상태 복구: armed=%s, in_air=%s -> status=%s, currentAction=%s",
+                armed, in_air, self._status, current_action,
+            )
+        except Exception as e:
+            logger.exception(
+                "재시작 상태 복구 실패 - 실제 상태를 확인할 수 없어 상태 파일을 쓰지 않음: %s",
+                e,
+            )
 
     def start_battery_watch(self):
         """
@@ -214,9 +264,89 @@ class DroneCommandHandler:
         """
         asyncio.create_task(self._battery_watch_loop())
 
-    async def _battery_watch_loop(self):
+    def start_anomaly_hold_watch(self):
+        """main.py가 남긴 이상 감지 호버 요청을 비행 이벤트 루프에서 처리한다."""
+        asyncio.create_task(self._anomaly_hold_watch_loop())
+
+    def _update_anomaly_hold_state(self, request_id: str, status: str, **extra) -> bool:
+        current = read_json(ANOMALY_HOLD_STATE_PATH, None)
+        if not isinstance(current, dict) or current.get("request_id") != request_id:
+            logger.info(
+                "이상 감지 호버 결과 기록 생략: 더 최신 요청이 존재함 "
+                f"(완료={request_id}, 현재={current.get('request_id') if isinstance(current, dict) else None})"
+            )
+            return False
+        updated = dict(current)
+        updated["status"] = status
+        updated["updated_at"] = time.time()
+        updated.update(extra)
+        atomic_write_json(ANOMALY_HOLD_STATE_PATH, updated)
+        return True
+
+    async def _anomaly_hold_watch_loop(self):
+        while True:
+            try:
+                request = read_json(ANOMALY_HOLD_STATE_PATH, None)
+                if isinstance(request, dict) and request.get("status") == "requested":
+                    request_id = str(request.get("request_id") or "")
+                    requested_at = float(request.get("requested_at"))
+                    if not request_id:
+                        raise ValueError("request_id 없음")
+                    if request_id == self._last_anomaly_hold_request_id:
+                        await asyncio.sleep(0.2)
+                        continue
+
+                    self._last_anomaly_hold_request_id = request_id
+                    age = time.time() - requested_at
+                    if not math.isfinite(requested_at) or age < -5.0 or age > ANOMALY_HOLD_REQUEST_TTL_SEC:
+                        self._update_anomaly_hold_state(request_id, "expired", age_sec=age)
+                    elif self._status == "PAUSED":
+                        self._update_anomaly_hold_state(request_id, "succeeded", detail="already_paused")
+                    elif self._status not in ("PATROLLING", "RETURNING"):
+                        self._update_anomaly_hold_state(
+                            request_id, "rejected", detail=f"unsafe_status:{self._status}"
+                        )
+                    elif self._current_action == "BATTERY_RTL":
+                        self._update_anomaly_hold_state(
+                            request_id, "rejected", detail="battery_rtl_in_progress"
+                        )
+                    else:
+                        self._update_anomaly_hold_state(request_id, "processing")
+                        self._submit_flight_command(
+                            "ANOMALY_HOLD",
+                            lambda generation, rid=request_id: self._anomaly_hold(generation, rid),
+                            True,
+                        )
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.exception(f"이상 감지 호버 요청 감시 오류: {e}")
+            await asyncio.sleep(0.2)
+
+    async def _anomaly_hold(self, generation: int, request_id: str):
         try:
-            async for battery in self.system.telemetry.battery():
+            await asyncio.wait_for(self.system.action.hold(), timeout=ACTION_TIMEOUT_SEC)
+            if not self._is_current_command(generation):
+                self._update_anomaly_hold_state(request_id, "superseded")
+                return
+            self._cancel_watch_task()
+            self._status = "PAUSED"
+            self._write_status_state(current_action="ANOMALY_HOLD")
+            self._update_anomaly_hold_state(request_id, "succeeded")
+            logger.warning(f"이상 감지 호버 완료 (requestId={request_id})")
+        except asyncio.TimeoutError:
+            self._update_anomaly_hold_state(request_id, "failed", error="timeout")
+            logger.error(f"이상 감지 호버 타임아웃 (requestId={request_id})")
+        except Exception as e:
+            self._update_anomaly_hold_state(request_id, "failed", error=str(e))
+            logger.exception(f"이상 감지 호버 실패 (requestId={request_id}): {e}")
+
+    async def _battery_watch_loop(self):
+        last_unit = None
+        last_invalid_log_time = 0.0
+        while True:
+            try:
+                async for battery in self.system.telemetry.battery():
                 # ★2026-08-26: MAVSDK battery.remaining_percent 스펙은 항상 0.0~1.0
                 # fraction (공식 문서 기준). 예전엔 "이미 0~100으로 온 경우" 대비
                 # `if pct <= 1.0: pct *= 100` 방어코드가 있었으나, 이건 원래
@@ -224,21 +354,56 @@ class DroneCommandHandler:
                 # 배터리가 진짜 1% 미만으로 위급한 상황을 "이미 변환된 값"으로
                 # 오판해 RTL 페일세이프가 트리거 안 될 수 있는 위험이 있었음.
                 # 스펙대로 항상 고정 변환.
-                pct = battery.remaining_percent * 100.0
+                    try:
+                        pct = self._battery_normalizer.normalize(
+                            battery.remaining_percent
+                        )
+                    except ValueError as e:
+                        now = time.monotonic()
+                        if now - last_invalid_log_time >= 30.0:
+                            logger.warning(f"배터리 값 없음/무효 - RTL 판정 보류: {e}")
+                            last_invalid_log_time = now
+                        continue
 
-                if (
-                    pct <= BATTERY_RTL_THRESHOLD_PERCENT
-                    and not self._battery_rtl_triggered
-                    and self._status not in ("IDLE", "LANDING")
-                ):
-                    logger.warning(
-                        f"🔋 배터리 {pct:.1f}% <= 임계값({BATTERY_RTL_THRESHOLD_PERCENT}%) "
-                        f"- 자율 복귀(BATTERY_RTL) 트리거"
+                    self._latest_battery_percent = pct
+                    if last_unit != self._battery_normalizer.unit:
+                        last_unit = self._battery_normalizer.unit
+                        logger.warning(
+                            "배터리 잔량 단위 적용: %s (raw=%s, normalized=%.1f%%)",
+                            last_unit,
+                            battery.remaining_percent,
+                            pct,
+                        )
+
+                    if (
+                        self._status == "IDLE"
+                        and pct > BATTERY_RTL_THRESHOLD_PERCENT + 5.0
+                    ):
+                        self._battery_rtl_triggered = False
+
+                    retry_ready = (
+                        time.monotonic() - self._battery_rtl_last_attempt
+                        >= BATTERY_RTL_RETRY_SEC
                     )
-                    self._battery_rtl_triggered = True
-                    asyncio.create_task(self._battery_rtl())
-        except Exception as e:
-            logger.error(f"배터리 감시 오류: {e}")
+                    if (
+                        pct <= BATTERY_RTL_THRESHOLD_PERCENT
+                        and not self._battery_rtl_triggered
+                        and retry_ready
+                        and self._status not in ("IDLE", "LANDING")
+                    ):
+                        logger.warning(
+                            f"🔋 배터리 {pct:.1f}% <= 임계값({BATTERY_RTL_THRESHOLD_PERCENT}%) "
+                            f"- 자율 복귀(BATTERY_RTL) 트리거"
+                        )
+                        self._battery_rtl_triggered = True
+                        self._battery_rtl_last_attempt = time.monotonic()
+                        self._invalidate_active_command("BATTERY_RTL")
+                        asyncio.create_task(self._battery_rtl())
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.exception(f"배터리 감시 오류 - 2초 후 재구독: {e}")
+                await asyncio.sleep(2.0)
 
     async def _battery_rtl(self):
         """
@@ -256,9 +421,11 @@ class DroneCommandHandler:
                 await self.system.action.hold()
             except Exception as e:
                 logger.error(f"비상 hold() 실패: {e}")
+            self._battery_rtl_triggered = False
             return
 
         try:
+            self._capture_patrol_resume_index()
             self._cancel_watch_task()
             self._status = "RETURNING"
             self._write_status_state(current_action="BATTERY_RTL")
@@ -266,9 +433,16 @@ class DroneCommandHandler:
                 f"🔋 배터리 자율복귀 비행 시작 -> 스테이션 lat={self._station['lat']}, "
                 f"lon={self._station['lon']} (도착 후 착륙까지 수행)"
             )
-            ok = await self.mission.upload_and_start(
-                [{"lat": self._station["lat"], "lon": self._station["lon"], "alt": DEFAULT_ALTITUDE}],
-                altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED,
+            generation = self._command_generation
+            ok = await asyncio.wait_for(
+                self.mission.upload_and_start(
+                    [{"lat": self._station["lat"], "lon": self._station["lon"], "alt": DEFAULT_ALTITUDE}],
+                    altitude=DEFAULT_ALTITUDE,
+                    speed=DEFAULT_SPEED,
+                    continue_check=lambda: self._is_current_command(generation),
+                    mission_kind="return",
+                ),
+                timeout=ACTION_TIMEOUT_SEC * 2,
             )
             if ok:
                 self._watch_task = asyncio.create_task(
@@ -280,15 +454,75 @@ class DroneCommandHandler:
                 )
             else:
                 logger.error("🔋 배터리 자율복귀 비행 시작 실패")
+                self._battery_rtl_triggered = False
         except Exception as e:
-            logger.error(f"❌ 배터리 자율복귀 실패: {e}")
+            self._battery_rtl_triggered = False
+            logger.exception(f"❌ 배터리 자율복귀 실패: {e}")
+
+    def _is_current_command(self, generation: int) -> bool:
+        return generation == self._command_generation
+
+    def _capture_patrol_resume_index(self) -> None:
+        if (
+            self.mission is not None
+            and self.mission.current_mission_kind == "patrol"
+            and self._loaded_patrol_route_version == self._route_version
+            and self._route
+        ):
+            self._patrol_resume_index = min(
+                self._patrol_mission_base_index + self.mission.last_progress_current,
+                len(self._route) - 1,
+            )
+            logger.info(f"순찰 재개 index 저장: {self._patrol_resume_index}")
+
+    def _invalidate_active_command(self, reason: str) -> int:
+        with self._command_lock:
+            self._command_generation += 1
+            future = self._active_command_future
+            if future is not None and not future.done():
+                logger.warning(f"진행 중 비행 명령 취소 요청 ({reason})")
+                future.cancel()
+            return self._command_generation
+
+    def _submit_flight_command(self, action: str, coroutine_factory, preempt: bool):
+        with self._command_lock:
+            active = self._active_command_future
+            if active is not None and not active.done():
+                if not preempt:
+                    logger.warning(f"{action}: 다른 비행 명령 수행 중이므로 거부")
+                    return
+                self._command_generation += 1
+                active.cancel()
+                logger.warning(f"{action}: 진행 중 명령을 선점")
+            else:
+                self._command_generation += 1
+
+            generation = self._command_generation
+            future = asyncio.run_coroutine_threadsafe(
+                coroutine_factory(generation), self.loop
+            )
+            self._active_command_future = future
+
+        def _done(done_future):
+            try:
+                done_future.result()
+            except (asyncio.CancelledError, concurrent.futures.CancelledError):
+                logger.info(f"{action}: 취소 완료")
+            except Exception:
+                logger.exception(f"{action}: 비행 명령 작업 예외")
+
+        future.add_done_callback(_done)
 
     def _on_battery_rtl_arrival(self):
         """배터리 자율복귀 도착 콜백 - RETURN_TO_STATION과 달리 착륙까지 진행."""
         logger.warning("🔋 배터리 자율복귀 스테이션 도착 - 착륙 시작 (호버링하지 않음)")
         asyncio.create_task(self._land())
 
-    def _write_status_state(self, current_action: Optional[str] = None):
+    def _write_status_state(
+        self,
+        current_action: Optional[str] = None,
+        preserve_current_action: bool = False,
+    ):
         """telemetry_sender.py가 읽어갈 상태 공유 파일 갱신.
 
         ★2026-08-26: hasRoute 추가. 서버 Telemetry.java의 GET /{droneId}/route
@@ -299,13 +533,19 @@ class DroneCommandHandler:
         들고 있는 경로이므로 그대로 반영.
         """
         try:
-            with open(STATUS_STATE_PATH, "w") as f:
-                json.dump({
-                    "status": self._status,
-                    "currentAction": current_action,
-                    "hasRoute": bool(self._route),
-                    "hasStation": bool(self._station),
-                }, f)
+            if not preserve_current_action:
+                self._current_action = current_action
+            atomic_write_json(STATUS_STATE_PATH, {
+                "status": self._status,
+                "currentAction": self._current_action,
+                "hasRoute": bool(self._route),
+                "hasStation": bool(
+                    self._station
+                    and self._station.get("lat") is not None
+                    and self._station.get("lon") is not None
+                ),
+                "updatedAt": time.time(),
+            })
         except Exception as e:
             logger.debug(f"상태 공유 파일 쓰기 실패: {e}")
 
@@ -325,18 +565,39 @@ class DroneCommandHandler:
         """
         cmd_data = cmd_data or {}
         try:
+            stream_id = cmd_data.get("streamId")
+            upload_path = cmd_data.get("uploadPath")
+            fps = float(cmd_data.get("fps", STREAM_DEFAULT_FPS))
+            width = int(cmd_data.get("width", STREAM_DEFAULT_WIDTH))
+            height = int(cmd_data.get("height", STREAM_DEFAULT_HEIGHT))
+            quality = int(cmd_data.get("quality", STREAM_DEFAULT_QUALITY))
+            if enabled:
+                if not isinstance(stream_id, str) or not stream_id.strip():
+                    raise ValueError("REQUEST_STREAM streamId 누락")
+                if (
+                    not isinstance(upload_path, str)
+                    or not upload_path.startswith("/")
+                    or upload_path.startswith("//")
+                ):
+                    raise ValueError("REQUEST_STREAM uploadPath는 /로 시작하는 상대경로여야 함")
+            if not math.isfinite(fps) or not 1.0 <= fps <= 30.0:
+                raise ValueError(f"fps 범위 오류: {fps}")
+            if not 160 <= width <= 1920 or not 120 <= height <= 1080:
+                raise ValueError(f"해상도 범위 오류: {width}x{height}")
+            if not 20 <= quality <= 95:
+                raise ValueError(f"JPEG quality 범위 오류: {quality}")
+
             state = {
                 "stream_enabled": enabled,
                 "ts": time.time(),
-                "stream_id": cmd_data.get("streamId"),
-                "upload_path": cmd_data.get("uploadPath"),
-                "fps": cmd_data.get("fps", STREAM_DEFAULT_FPS),
-                "width": cmd_data.get("width", STREAM_DEFAULT_WIDTH),
-                "height": cmd_data.get("height", STREAM_DEFAULT_HEIGHT),
-                "quality": cmd_data.get("quality", STREAM_DEFAULT_QUALITY),
+                "stream_id": stream_id,
+                "upload_path": upload_path,
+                "fps": fps,
+                "width": width,
+                "height": height,
+                "quality": quality,
             }
-            with open(STREAM_REQUEST_STATE_PATH, "w") as f:
-                json.dump(state, f)
+            atomic_write_json(STREAM_REQUEST_STATE_PATH, state)
             logger.info(
                 f"📹 {'REQUEST_STREAM' if enabled else 'STOP_STREAM'} -> "
                 f"stream_enabled={enabled}, streamId={state['stream_id']}"
@@ -380,26 +641,24 @@ class DroneCommandHandler:
         logger.info(f"📥 명령 수신: {action} (대상: {target_id or '전체'})")
 
         if action == "START_PATROL":
-            asyncio.run_coroutine_threadsafe(self._start_patrol(), self.loop)
+            self._submit_flight_command("START_PATROL", self._start_patrol, False)
         elif action == "RESUME_PATROL":
-            asyncio.run_coroutine_threadsafe(self._resume_patrol(), self.loop)
+            self._submit_flight_command("RESUME_PATROL", self._resume_patrol, False)
         elif action == "PAUSE_PATROL":
-            asyncio.run_coroutine_threadsafe(self._pause_patrol(), self.loop)
+            self._submit_flight_command("PAUSE_PATROL", self._pause_patrol, True)
         elif action == "CANCEL_PATROL":
-            asyncio.run_coroutine_threadsafe(self._cancel_patrol(), self.loop)
+            self._submit_flight_command("CANCEL_PATROL", self._cancel_patrol, True)
         elif action == "RETURN_TO_STATION":
-            asyncio.run_coroutine_threadsafe(self._return_to_station(), self.loop)
+            self._submit_flight_command("RETURN_TO_STATION", self._return_to_station, False)
         elif action == "LAND":
-            asyncio.run_coroutine_threadsafe(self._land(), self.loop)
+            self._submit_flight_command("LAND", self._land, True)
         elif action == "EMERGENCY_STOP":
-            asyncio.run_coroutine_threadsafe(self._emergency_stop(), self.loop)
+            self._submit_flight_command("EMERGENCY_STOP", self._emergency_stop, True)
         elif action == "SET_ROUTE":
             asyncio.run_coroutine_threadsafe(self._set_route(route or []), self.loop)
         elif action == "SET_STATION":
             station = cmd_data.get("station", {})
-            # ★2026-08-21: 서버가 경도 키를 lng->lon으로 통일함
-            self._station = {"lat": station.get("lat"), "lon": station.get("lon")}
-            logger.info(f"🏠 SET_STATION: 스테이션 좌표 저장 lat={self._station['lat']}, lon={self._station['lon']}")
+            asyncio.run_coroutine_threadsafe(self._set_station(station), self.loop)
         elif action == "REQUEST_STREAM":
             self._set_stream_request(True, cmd_data)
         elif action == "STOP_STREAM":
@@ -418,10 +677,19 @@ class DroneCommandHandler:
 
     # ─── 비행 제어 액션들 ────────────────────────────────────────
 
-    async def _start_patrol(self):
+    async def _start_patrol(self, generation: int):
         """IDLE/PAUSED에서만 수락. 항상 경로를 처음부터 돈다."""
         if self._status not in ("IDLE", "PAUSED"):
             logger.warning(f"START_PATROL: 현재 상태({self._status})에서는 무시 (IDLE/PAUSED만 수락)")
+            return
+        if (
+            self._latest_battery_percent is not None
+            and self._latest_battery_percent <= BATTERY_RTL_THRESHOLD_PERCENT
+        ):
+            logger.error(
+                f"START_PATROL: 배터리 {self._latest_battery_percent:.1f}%로 "
+                "자율복귀 임계값 이하 - 이륙 거부"
+            )
             return
         try:
             logger.info("🚀 START_PATROL 실행 (지상/일시정지 -> 처음부터 순찰)")
@@ -429,10 +697,17 @@ class DroneCommandHandler:
                 logger.info(f"저장된 경로 {len(self._route)}개 지점으로 순찰 비행 시작")
                 ok = await asyncio.wait_for(
                     self.mission.upload_and_start(
-                        self._route, altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
+                        self._route,
+                        altitude=DEFAULT_ALTITUDE,
+                        speed=DEFAULT_SPEED,
+                        continue_check=lambda: self._is_current_command(generation),
+                        mission_kind="patrol",
                     ), timeout=ACTION_TIMEOUT_SEC * 2
                 )
-                if ok:
+                if ok and self._is_current_command(generation):
+                    self._loaded_patrol_route_version = self._route_version
+                    self._patrol_resume_index = 0
+                    self._patrol_mission_base_index = 0
                     self._status = "PATROLLING"
                     self._write_status_state()
                     self._cancel_watch_task()
@@ -441,31 +716,16 @@ class DroneCommandHandler:
                     )
                 logger.info(f"미션 비행 {'시작됨' if ok else '실패'}")
             else:
-                # ★2026-08-25 진단강화: 경로가 비어있으면 관제사 의도(순찰)와
-                # 다르게 "제자리 이륙"만 하게 됨. SET_ROUTE가 아직 도착 안했거나
-                # 처리 순서가 꼬인 경합(race condition) 가능성이 높은 상황이라
-                # 반드시 눈에 띄게 경고로 남긴다 (2026-08-25 실기에서 이 경로로
-                # 빠져 2m 남짓한 저고도 호버링만 지속된 사례 있었음).
-                logger.warning(
-                    "⚠️ START_PATROL: 저장된 경로(_route)가 비어있음! "
-                    "SET_ROUTE가 아직 도착 전이거나 순서가 꼬였을 가능성 - "
-                    "제자리 이륙만 수행됨 (의도한 순찰 비행이 아닐 수 있음)"
+                logger.error(
+                    "START_PATROL 거부: 저장된 경로가 없음. "
+                    "SET_ROUTE 적용 후 다시 시도해야 하며 제자리 이륙은 수행하지 않음"
                 )
-                async for is_armed in self.system.telemetry.armed():
-                    if not is_armed:
-                        logger.info("드론 무장 시도...")
-                        await asyncio.wait_for(self.system.action.arm(), timeout=ACTION_TIMEOUT_SEC)
-                    break
-                logger.info("이륙 시도... (경로 없음, 제자리 비행)")
-                await asyncio.wait_for(self.system.action.takeoff(), timeout=ACTION_TIMEOUT_SEC)
-                self._status = "PATROLLING"
-                self._write_status_state()
         except asyncio.TimeoutError:
             logger.error(f"⏱️ START_PATROL 타임아웃")
         except Exception as e:
             logger.exception(f"❌ START_PATROL 실패: {e}")
 
-    async def _resume_patrol(self):
+    async def _resume_patrol(self, generation: int):
         """PAUSED/RETURNING에서 수락. 중단 지점부터 이어서 순찰."""
         if self._status not in ("PAUSED", "RETURNING"):
             logger.warning(f"RESUME_PATROL: 현재 상태({self._status})에서는 무시 (PAUSED/RETURNING만 수락)")
@@ -475,12 +735,34 @@ class DroneCommandHandler:
             return
         try:
             logger.info("▶️ RESUME_PATROL 실행 (호버링/복귀중단 -> 저장경로로 재개)")
-            ok = await asyncio.wait_for(
-                self.mission.upload_and_start(
-                    self._route, altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
-                ), timeout=ACTION_TIMEOUT_SEC * 2
+            can_resume_loaded = (
+                self.mission.current_mission_kind == "patrol"
+                and self._loaded_patrol_route_version == self._route_version
             )
-            if ok:
+            if can_resume_loaded:
+                logger.info("PX4에 남아 있는 순찰 미션을 현재 index부터 재개")
+                ok = await asyncio.wait_for(
+                    self.mission.resume_mission(), timeout=ACTION_TIMEOUT_SEC
+                )
+            else:
+                start_index = min(self._patrol_resume_index, len(self._route) - 1)
+                remaining_route = self._route[start_index:]
+                logger.info(
+                    f"복귀 미션으로 덮인 순찰 경로를 index={start_index}부터 재구성"
+                )
+                ok = await asyncio.wait_for(
+                    self.mission.upload_and_start(
+                        remaining_route,
+                        altitude=DEFAULT_ALTITUDE,
+                        speed=DEFAULT_SPEED,
+                        continue_check=lambda: self._is_current_command(generation),
+                        mission_kind="patrol",
+                    ), timeout=ACTION_TIMEOUT_SEC * 2
+                )
+                if ok:
+                    self._loaded_patrol_route_version = self._route_version
+                    self._patrol_mission_base_index = start_index
+            if ok and self._is_current_command(generation):
                 self._status = "PATROLLING"
                 self._write_status_state()
                 self._cancel_watch_task()
@@ -493,11 +775,13 @@ class DroneCommandHandler:
         except Exception as e:
             logger.error(f"❌ RESUME_PATROL 실패: {e}")
 
-    async def _pause_patrol(self):
+    async def _pause_patrol(self, generation: int):
         """비행 중 -> 현재 위치에서 호버링. 경로는 보존."""
         try:
             logger.info("🛑 PAUSE_PATROL -> 호버링 (경로 보존)")
             await asyncio.wait_for(self.system.action.hold(), timeout=ACTION_TIMEOUT_SEC)
+            if not self._is_current_command(generation):
+                return
             self._cancel_watch_task()
             self._status = "PAUSED"
             self._write_status_state()
@@ -506,7 +790,7 @@ class DroneCommandHandler:
         except Exception as e:
             logger.error(f"❌ PAUSE_PATROL 실패: {e}")
 
-    async def _cancel_patrol(self):
+    async def _cancel_patrol(self, generation: int):
         """
         ★★★ 2026-08-17 의미 변경: 더 이상 Kill Switch가 아니다 ★★★
         즉각 호버링 + 경로 초기화. 착륙하지 않고 모터도 끄지 않는다.
@@ -517,8 +801,13 @@ class DroneCommandHandler:
         try:
             logger.info("🚫 CANCEL_PATROL 실행 (호버링 + 경로초기화, 모터 유지)")
             await asyncio.wait_for(self.system.action.hold(), timeout=ACTION_TIMEOUT_SEC)
+            if not self._is_current_command(generation):
+                return
             self._cancel_watch_task()
             self._route = []
+            self._route_version += 1
+            self._loaded_patrol_route_version = None
+            self._patrol_resume_index = 0
             self._status = "PAUSED"
             self._write_status_state()
             try:
@@ -530,7 +819,7 @@ class DroneCommandHandler:
         except Exception as e:
             logger.error(f"❌ CANCEL_PATROL 실패: {e}")
 
-    async def _return_to_station(self):
+    async def _return_to_station(self, generation: int):
         """
         PATROLLING/PAUSED -> RETURNING. 순찰 경로(self._route)는
         절대 지우지 않는다 (2026-08-14 규약) - RESUME_PATROL로 복귀를
@@ -545,16 +834,20 @@ class DroneCommandHandler:
             f"저장된스테이션={self._station}"
         )
         try:
+            self._capture_patrol_resume_index()
             if self._station and self._station.get("lat") is not None:
                 logger.info(f"🏠 RETURN_TO_STATION 실행: 스테이션으로 귀환 lat={self._station['lat']}, lon={self._station['lon']} (순찰경로 보존)")
                 # 순찰 경로(self._route)는 그대로 두고, 스테이션 좌표로만 별도 비행
                 ok = await asyncio.wait_for(
                     self.mission.upload_and_start(
                         [{"lat": self._station["lat"], "lon": self._station["lon"], "alt": DEFAULT_ALTITUDE}],
-                        altitude=DEFAULT_ALTITUDE, speed=DEFAULT_SPEED
+                        altitude=DEFAULT_ALTITUDE,
+                        speed=DEFAULT_SPEED,
+                        continue_check=lambda: self._is_current_command(generation),
+                        mission_kind="return",
                     ), timeout=ACTION_TIMEOUT_SEC * 2
                 )
-                if ok:
+                if ok and self._is_current_command(generation):
                     self._status = "RETURNING"
                     self._write_status_state()
                     self._cancel_watch_task()
@@ -576,6 +869,8 @@ class DroneCommandHandler:
                     f"- PX4 기본 RTL로 대체"
                 )
                 await asyncio.wait_for(self.system.action.return_to_launch(), timeout=ACTION_TIMEOUT_SEC)
+                if not self._is_current_command(generation):
+                    return
                 self._status = "RETURNING"
                 self._write_status_state()
         except asyncio.TimeoutError:
@@ -585,18 +880,23 @@ class DroneCommandHandler:
         except Exception as e:
             logger.exception(f"❌ RETURN_TO_STATION 실패: {e}")
 
-    async def _land(self):
+    async def _land(self, generation: int = None):
         """
         신설(구 LAND_PATROL 자리, 미구현이었음). 공중 -> 현재위치에서
         안전하게 하강 착륙. 자동착륙 폐지 이후, 착륙은 오직 이 명령을
         받았을 때만 수행한다.
         """
+        if generation is None:
+            generation = self._command_generation
+        previous_status = self._status
         try:
             logger.info("🛬 LAND 실행 (현재위치 하강 착륙)")
             self._cancel_watch_task()
             self._status = "LANDING"
             self._write_status_state()
             await asyncio.wait_for(self.system.action.land(), timeout=ACTION_TIMEOUT_SEC)
+            if not self._is_current_command(generation):
+                return
             # 하강 완료 감지는 in_air 폴링으로 처리.
             # ★2026-08-26: 이 감시 태스크를 self._watch_task에 저장해
             # _cancel_watch_task()로 취소 가능하게 함. 기존엔 참조가
@@ -625,11 +925,15 @@ class DroneCommandHandler:
                     raise
             self._watch_task = asyncio.create_task(_wait_landed())
         except asyncio.TimeoutError:
+            self._status = previous_status
+            self._write_status_state(current_action="LAND_FAILED")
             logger.error(f"⏱️ LAND 타임아웃")
         except Exception as e:
+            self._status = previous_status
+            self._write_status_state(current_action="LAND_FAILED")
             logger.error(f"❌ LAND 실패: {e}")
 
-    async def _emergency_stop(self):
+    async def _emergency_stop(self, generation: int):
         """
         ★★★ 진짜 Kill Switch (신설, 구 CANCEL_PATROL의 역할 승계) ★★★
         관제사 승인 하에, 고도와 무관하게 즉시 모터 차단.
@@ -637,15 +941,20 @@ class DroneCommandHandler:
         """
         try:
             logger.warning("🚨 EMERGENCY_STOP 실행 (즉시 kill - 관제사 승인된 강제정지)")
+            kill_confirmed = False
             try:
                 await asyncio.wait_for(self.system.action.kill(), timeout=EMERGENCY_STOP_TIMEOUT_SEC)
                 logger.info("✅ kill(강제disarm) 완료")
+                kill_confirmed = True
             except asyncio.TimeoutError:
                 logger.error(f"⏱️ kill 타임아웃 ({EMERGENCY_STOP_TIMEOUT_SEC}s) - 응답 없음")
             self._cancel_watch_task()
             self._route = []
-            self._status = "IDLE"
-            self._write_status_state()
+            if kill_confirmed and self._is_current_command(generation):
+                self._status = "IDLE"
+                self._write_status_state()
+            else:
+                self._write_status_state(current_action="EMERGENCY_STOP_UNCONFIRMED")
         except Exception as e:
             logger.error(f"❌ EMERGENCY_STOP 실패: {e}")
 
@@ -664,17 +973,55 @@ class DroneCommandHandler:
           에서 일괄 처리 (여기서는 원본 alt_agl 값을 그대로 저장)
         """
         try:
-            self._route = [
-                {
-                    "lat": float(pt["lat"]),
-                    "lon": float(pt["lon"]),
-                    "alt": float(pt.get("alt_agl", 50.0)),
-                }
-                for pt in route
-            ]
+            parsed_route = []
+            for index, pt in enumerate(route):
+                if not isinstance(pt, dict):
+                    raise ValueError(f"route[{index}]가 객체가 아님")
+                lat = float(pt["lat"])
+                lon = float(pt["lon"])
+                alt = float(pt.get("alt_agl", 50.0))
+                ground = pt.get("ground_elevation_m")
+                ground = None if ground is None else float(ground)
+                numeric = (lat, lon, alt) if ground is None else (lat, lon, alt, ground)
+                if not all(math.isfinite(v) for v in numeric):
+                    raise ValueError(f"route[{index}]에 유한하지 않은 값이 있음")
+                if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+                    raise ValueError(f"route[{index}] 좌표 범위 오류: lat={lat}, lon={lon}")
+                if alt <= 0.0 or alt > 500.0:
+                    raise ValueError(f"route[{index}] alt_agl 범위 오류: {alt}")
+                parsed_route.append({
+                    "lat": lat,
+                    "lon": lon,
+                    "alt_agl": alt,
+                    "ground_elevation_m": ground,
+                })
+
+            self._route = parsed_route
+            self._route_version += 1
+            self._loaded_patrol_route_version = None
+            self._patrol_resume_index = 0
+            self._patrol_mission_base_index = 0
+            self._write_status_state(preserve_current_action=True)
             logger.info(f"🗺️ SET_ROUTE: {len(self._route)}개 지점 저장 완료 (비행은 START_PATROL 대기)")
         except Exception as e:
             logger.error(f"❌ SET_ROUTE 실패: {e}")
+
+    async def _set_station(self, station: dict):
+        """스테이션 좌표를 검증해 저장하고 보유 상태를 즉시 공유한다."""
+        try:
+            if not isinstance(station, dict):
+                raise ValueError("station이 객체가 아님")
+            lat = float(station["lat"])
+            lon = float(station["lon"])
+            if not math.isfinite(lat) or not math.isfinite(lon):
+                raise ValueError("스테이션 좌표가 유한하지 않음")
+            if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+                raise ValueError(f"스테이션 좌표 범위 오류: lat={lat}, lon={lon}")
+            self._station = {"lat": lat, "lon": lon}
+            self._write_status_state(preserve_current_action=True)
+            logger.info(f"🏠 SET_STATION: 스테이션 좌표 저장 lat={lat}, lon={lon}")
+        except Exception as e:
+            logger.error(f"❌ SET_STATION 실패: {e}")
 
 
 class CommandListener(stomp.ConnectionListener):
@@ -731,7 +1078,9 @@ async def main():
     loop = asyncio.get_event_loop()
     handler = DroneCommandHandler(loop)
     await handler.connect()
+    await handler.recover_initial_state()
     handler.start_battery_watch()  # ★2026-08-21: 배터리 자율복귀 페일세이프 상시 감시 시작
+    handler.start_anomaly_hold_watch()
 
     t = threading.Thread(target=run_stomp, args=(handler,), daemon=True)
     t.start()

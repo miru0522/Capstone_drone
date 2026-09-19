@@ -521,10 +521,14 @@ class VadCLIPScorer:
                 f"CLIP feature shape mismatch: {feats.shape}, "
                 f"expected ({VADCLIP_SNIPPETS_PER_WINDOW},{EMBED_DIM})"
             )
+        if not np.isfinite(feats).all():
+            raise RuntimeError("CLIP feature contains NaN or Inf")
 
         self.feature_buffer.push(feats)
         x, valid_len = self.feature_buffer.as_input()
         prob1 = self.head.prob1(x, valid_len)
+        if not np.isfinite(prob1).all():
+            raise RuntimeError("VadCLIP probability contains NaN or Inf")
 
         n = min(valid_len, len(prob1))
         lo = max(0, n - VADCLIP_SNIPPETS_PER_WINDOW)
@@ -533,4 +537,6 @@ class VadCLIPScorer:
             return 0.0
         ordered = np.sort(seg)[::-1]
         score = float(ordered[: min(self.topk, ordered.size)].mean())
+        if not np.isfinite(score):
+            raise RuntimeError(f"VadCLIP score is not finite: {score}")
         return max(0.0, min(1.0, score))

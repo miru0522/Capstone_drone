@@ -35,6 +35,7 @@ import os
 import json
 import time
 import asyncio
+import math
 import logging
 import threading
 from urllib.parse import urlparse
@@ -43,6 +44,8 @@ from typing import Optional
 import stomp
 import websocket
 from mavsdk import System
+from state_store import read_json
+from battery_utils import BatteryPercentNormalizer
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger("telemetry_sender")
@@ -82,11 +85,7 @@ websocket.create_connection = _patched_create_connection
 
 def read_status_state() -> dict:
     """command_receiver.py가 기록해두는 상태 공유 파일을 읽는다."""
-    try:
-        with open(STATUS_STATE_PATH, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {"status": "IDLE", "currentAction": None, "hasRoute": False, "hasStation": False}
+    return read_json(STATUS_STATE_PATH, None)
 
 
 class TelemetrySender:
@@ -103,6 +102,7 @@ class TelemetrySender:
         }
         self._tasks = []
         self.running = False
+        self._battery_normalizer = BatteryPercentNormalizer()
 
     # ─── MAVSDK (드론 상태 수집) ────────────────────────────────
 
@@ -123,40 +123,71 @@ class TelemetrySender:
         logger.info("✅ 드론 연결 성공")
 
     async def watch_connection(self):
-        try:
-            async for state in self.system.core.connection_state():
-                self.state["is_connected"] = state.is_connected
-                if state.is_connected:
-                    logger.info("✅ 픽스호크 연결 확인 (Heartbeat 수신 중)")
-                else:
-                    logger.warning("❌ 픽스호크 연결 끊김 (Heartbeat 미수신)")
-        except Exception as e:
-            logger.error(f"연결 모니터링 오류: {e}")
+        while self.running:
+            try:
+                async for state in self.system.core.connection_state():
+                    self.state["is_connected"] = state.is_connected
+                    if state.is_connected:
+                        logger.info("✅ 픽스호크 연결 확인 (Heartbeat 수신 중)")
+                    else:
+                        logger.warning("❌ 픽스호크 연결 끊김 (Heartbeat 미수신)")
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                self.state["is_connected"] = False
+                logger.error(f"연결 모니터링 오류 - 2초 후 재구독: {e}")
+                await asyncio.sleep(2.0)
 
     async def watch_battery(self):
-        try:
-            async for battery in self.system.telemetry.battery():
-                # ★2026-08-26: MAVSDK battery.remaining_percent 스펙은 항상 0.0~1.0
-                # fraction (공식 문서 기준). 예전엔 "이미 0~100으로 온 경우" 대비
-                # `if pct <= 1.0: pct *= 100` 방어코드가 있었으나, 이건 원래
-                # 코드 다른 곳의 이중곱셈 버그(9900% 사고, 2026-07-18) 땜질이었고
-                # 배터리가 진짜 1% 미만으로 위급한 상황을 "이미 변환된 값"으로
-                # 오판할 위험이 있었음 (command_receiver.py의 배터리 RTL 판정에도
-                # 동일 로직이 있어 같이 수정함). 스펙대로 항상 고정 변환.
-                pct = battery.remaining_percent * 100.0
-                self.state["batt_percent"] = round(pct, 1)
-                self.state["batt_volt"] = round(battery.voltage_v, 2)
-        except Exception as e:
-            logger.debug(f"배터리 스트림 오류: {e}")
+        last_unit = None
+        last_invalid_log_time = 0.0
+        while self.running:
+            try:
+                async for battery in self.system.telemetry.battery():
+                    try:
+                        pct = self._battery_normalizer.normalize(battery.remaining_percent)
+                    except ValueError as e:
+                        now = time.monotonic()
+                        if now - last_invalid_log_time >= 30.0:
+                            logger.warning(f"배터리 값 없음/무효 - 샘플 건너뜀: {e}")
+                            last_invalid_log_time = now
+                        continue
+                    voltage = float(battery.voltage_v)
+                    if not math.isfinite(voltage) or voltage < 0.0:
+                        raise ValueError(f"유효하지 않은 전압: {voltage}")
+                    self.state["batt_percent"] = round(pct, 1)
+                    self.state["batt_volt"] = round(voltage, 2)
+                    if last_unit != self._battery_normalizer.unit:
+                        last_unit = self._battery_normalizer.unit
+                        logger.warning(
+                            "배터리 용량 단위 적용: %s (raw=%s, normalized=%.1f%%)",
+                            last_unit, battery.remaining_percent, pct,
+                        )
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"배터리 스트림 오류 - 2초 후 재구독: {e}")
+                await asyncio.sleep(2.0)
 
     async def watch_position(self):
-        try:
-            async for position in self.system.telemetry.position():
-                self.state["lat"] = round(position.latitude_deg, 6)
-                self.state["lon"] = round(position.longitude_deg, 6)
-                self.state["alt"] = round(position.absolute_altitude_m, 2)
-        except Exception as e:
-            logger.debug(f"GPS 스트림 오류: {e}")
+        while self.running:
+            try:
+                async for position in self.system.telemetry.position():
+                    lat = float(position.latitude_deg)
+                    lon = float(position.longitude_deg)
+                    alt = float(position.absolute_altitude_m)
+                    if not all(math.isfinite(v) for v in (lat, lon, alt)):
+                        raise ValueError("GPS 값에 NaN/Inf 포함")
+                    if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+                        raise ValueError(f"GPS 범위 오류: lat={lat}, lon={lon}")
+                    self.state["lat"] = round(lat, 6)
+                    self.state["lon"] = round(lon, 6)
+                    self.state["alt"] = round(alt, 2)
+            except asyncio.CancelledError:
+                raise
+            except Exception as e:
+                logger.error(f"GPS 스트림 오류 - 2초 후 재구독: {e}")
+                await asyncio.sleep(2.0)
 
     # ─── STOMP (텔레메트리 발행) ────────────────────────────────
 
@@ -224,9 +255,12 @@ class TelemetrySender:
                 was_waiting = False
 
             status_info = read_status_state()
+            if not isinstance(status_info, dict) or not status_info.get("status"):
+                logger.warning("상태 공유 파일 읽기 실패 - 이번 텔레메트리 전송 생략")
+                continue
             payload = {
                 "droneId": DRONE_ID,
-                "status": status_info.get("status", "IDLE"),
+                "status": status_info["status"],
                 "currentAction": status_info.get("currentAction"),
                 "hasRoute": bool(status_info.get("hasRoute", False)),
                 "hasStation": bool(status_info.get("hasStation", False)),

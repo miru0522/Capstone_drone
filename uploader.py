@@ -67,6 +67,12 @@ def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
     try:
         for entry in frames:
             writer.write(entry.frame)
+    except Exception:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise
     finally:
         writer.release()
 
@@ -202,4 +208,3 @@ def upload_clip_sync(
                 os.remove(path)
             except Exception:
                 pass
-

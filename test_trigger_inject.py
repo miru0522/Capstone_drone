@@ -20,6 +20,9 @@ import argparse
 import json
 import os
 import time
+import uuid
+
+from state_store import atomic_write_json
 
 
 def main():
@@ -43,12 +46,12 @@ def main():
         raise SystemExit(f"영상 파일을 찾을 수 없습니다: {video_path}")
 
     payload = {
+        "request_id": uuid.uuid4().hex,
         "video_path": video_path,
         "duration_sec": args.duration,
         "requested_at": time.time(),
     }
-    with open(args.state_path, "w") as f:
-        json.dump(payload, f)
+    atomic_write_json(args.state_path, payload)
 
     print("=" * 60)
     print("테스트 영상 주입 요청 기록 완료")
