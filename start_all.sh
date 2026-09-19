@@ -4,6 +4,7 @@ set -eu
 cd "$(dirname "$0")"
 
 export DEVICE_KEY="${DEVICE_KEY:-HPC-2026}"
+export UPLOAD_MODE="${UPLOAD_MODE:-B}"
 
 MAVSDK_SERVER_BIN="/usr/local/lib/python3.8/dist-packages/mavsdk/bin/mavsdk_server"
 SERIAL_PORT="/dev/pixhawk"
