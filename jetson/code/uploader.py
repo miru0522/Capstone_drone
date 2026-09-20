@@ -8,8 +8,8 @@ uploader.py  (서버 명세 v최종 기준)
   방식  : HTTP POST, multipart/form-data
   타임아웃: 180초 (AI 서버가 무거움)
 
-  A안 (현재): video 만 전송
-  B안 (향후): video + drone_id(int) + anomaly_score(float)
+  A안: video 만 전송 (구버전 호환)
+  B안: video + drone_id + anomaly_score 전송 (현재 VadCLIP 운영 모드)
 
 MODE 환경변수로 A/B 전환:
   UPLOAD_MODE = "A"  → 영상만
@@ -33,10 +33,21 @@ logger = logging.getLogger("uploader")
 # ─── 서버 명세 설정값 ────────────────────────────────────────────
 ANALYZE_URL = os.environ.get("ANALYZE_URL", "http://203.249.90.3:8031/analyze-video")
 UPLOAD_TIMEOUT_SEC = 180          # 명세: AI 서버 무거우므로 넉넉히
-UPLOAD_MODE = os.environ.get("UPLOAD_MODE", "A")   # "A" 또는 "B"
+UPLOAD_MODE = os.environ.get("UPLOAD_MODE", "A").upper()   # "A" 또는 "B"
 DRONE_ID = os.environ.get("DRONE_ID", "DR-01")    # B안에서 사용 (telemetry_sender의 DRONE_SYSID와 통일)
 MAX_RETRIES = 2
 RETRY_BACKOFF_SEC = 2
+
+if UPLOAD_MODE not in ("A", "B"):
+    raise ValueError(f"UPLOAD_MODE는 A 또는 B여야 함: {UPLOAD_MODE}")
+
+
+def _build_form_data(anomaly_score: Optional[float]) -> dict:
+    """B안 multipart 폼 데이터. 점수가 없으면 필드 자체를 보내지 않는다."""
+    data = {"drone_id": str(DRONE_ID)}
+    if anomaly_score is not None:
+        data["anomaly_score"] = str(anomaly_score)
+    return data
 
 
 def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
@@ -104,10 +115,7 @@ def _post_with_retry(path: str, anomaly_score: Optional[float]) -> bool:
 
                 if UPLOAD_MODE.upper() == "B":
                     # B안: anomaly_score + 드론ID 함께 전송
-                    data = {
-                        "drone_id": str(DRONE_ID),
-                        "anomaly_score": str(anomaly_score if anomaly_score is not None else 0.0),
-                    }
+                    data = _build_form_data(anomaly_score)
                     resp = requests.post(ANALYZE_URL, files=files, data=data,
                                          timeout=UPLOAD_TIMEOUT_SEC)
                 else:
@@ -175,10 +183,7 @@ def upload_clip_sync(
             files = {"video": (os.path.basename(path), f, "video/mp4")}
 
             if UPLOAD_MODE.upper() == "B":
-                data = {
-                    "drone_id": str(DRONE_ID),
-                    "anomaly_score": str(anomaly_score if anomaly_score is not None else 0.0),
-                }
+                data = _build_form_data(anomaly_score)
                 resp = requests.post(ANALYZE_URL, files=files, data=data,
                                      timeout=UPLOAD_TIMEOUT_SEC)
             else:
