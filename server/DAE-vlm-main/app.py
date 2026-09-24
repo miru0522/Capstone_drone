@@ -27,6 +27,7 @@ import threading
 import json
 import tempfile
 import subprocess
+import unicodedata
 from contextlib import asynccontextmanager
 
 # GPU 메모리 단편화 방지 (torch import 전에 설정해야 유효)
@@ -53,6 +54,11 @@ sys.path.insert(0, os.path.join(WEIGHTS_DIR, "videomae"))
 # 환경변수 로드
 BACKEND_URL = os.getenv("BACKEND_URL", "http://backend:8080")
 DEVICE_KEY = os.getenv("DEVICE_KEY", "default-device-key")
+
+# 상황설명·방송문·음성의 언어. docker-compose 의 environment 에서 바꿔 재시작하면
+# 재빌드 없이 영어로 되돌아간다. 프롬프트·후처리·TTS 가 모두 이 값 하나를 본다.
+AI_LANG = os.getenv("AI_LANG", "KO").upper()
+IS_KO = AI_LANG == "KO"
 print(f"[{datetime.now()}] AI Server started with BACKEND_URL={BACKEND_URL}")
 
 # =========================================================
@@ -65,9 +71,16 @@ VIDEOMAE_SUB_CKPT = os.path.join(
     WEIGHTS_DIR, "videomae", "checkpoints", "subclass_fold1_best_val_acc.pth"
 )
 QWEN_MODEL_PATH = os.path.join(WEIGHTS_DIR, "qwen", "Qwen3-VL-4B-Instruct")
-TTS_CKPT_PATH = os.path.join(WEIGHTS_DIR, "tts", "MeloTTS-English", "checkpoint.pth")
-TTS_CONFIG_PATH = os.path.join(WEIGHTS_DIR, "tts", "MeloTTS-English", "config.json")
+_TTS_DIR = "MeloTTS-Korean" if IS_KO else "MeloTTS-English"
+TTS_CKPT_PATH = os.path.join(WEIGHTS_DIR, "tts", _TTS_DIR, "checkpoint.pth")
+TTS_CONFIG_PATH = os.path.join(WEIGHTS_DIR, "tts", _TTS_DIR, "config.json")
+TTS_LANGUAGE = "KR" if IS_KO else "EN"
+TTS_SPEAKER = "KR" if IS_KO else "EN-Default"
+# 한국어는 1.0 이면 빠르게 들려 현장 방송에서 알아듣기 어렵다.
+TTS_SPEED = float(os.getenv("TTS_SPEED", "0.9" if IS_KO else "1.0"))
 TTS_OUTPUT_DIR = os.path.join(BASE_DIR, "tts_outputs")
+# 한국어 합성용 BERT(safetensors 로 변환해 둔 사본). Dockerfile 이 빌드 때 만든다.
+BERT_KOR_DIR = os.path.join(WEIGHTS_DIR, "tts", "bert-kor-base")
 
 # =========================================================
 # 전역 모델 변수
@@ -90,7 +103,7 @@ VLM_MIN_PIXELS = 256 * 256
 VLM_MAX_PIXELS = 512 * 512
 VLM_MAX_NEW_TOKENS = 512
 
-VLM_SYSTEM_PROMPT = (
+VLM_SYSTEM_PROMPT_EN = (
     "You are a security monitoring assistant for a patrol-drone control system. "
     "An upstream classifier (VideoMAE) has already determined the anomaly category for "
     "this clip. Treat that category as CONFIRMED and correct. Your job is NOT to re-judge "
@@ -120,6 +133,60 @@ VLM_SYSTEM_PROMPT = (
     "---END_SECTION_2---"
 )
 
+# 한국어판. 지시문 자체는 영어로 두고 "출력은 한국어"만 강제한다 —
+# 지시를 한국어로 번역하면 모델이 형식 태그까지 번역해 파싱이 깨진다.
+# 방송문은 어절이 아니라 글자 수로 제한한다(한국어는 어절 길이가 들쭉날쭉하다).
+VLM_SYSTEM_PROMPT_KO = (
+    "You are a security monitoring assistant for a patrol-drone control system. "
+    "An upstream classifier (VideoMAE) has already determined the anomaly category for "
+    "this clip. Treat that category as CONFIRMED and correct. Your job is NOT to re-judge "
+    "or question the category. Based on that category, describe the situation visible in "
+    "the video for a control-room operator.\n\n"
+    "Work as follows, writing each result into the matching section:\n"
+    "1) ADMIN_LOG: A natural, easy-to-read account of the situation for a control-room "
+    "operator, consistent with the given category. Write it in KOREAN using the polite "
+    "declarative style (…합니다 / …입니다 / …하고 있습니다). Do NOT use terse "
+    "report-fragment endings such as '…됨', '…보임', '…분류됨'. Order the account so it "
+    "flows naturally: first the PLACE/setting, then WHO is present, then WHAT they are "
+    "doing (present progressive), then the SURROUNDINGS/background, and finally what the "
+    "overall situation appears to be. Follow this shape:\n"
+    "   '(장소)에서 (대상)이 (행동)을 하고 있습니다. 주변은 (배경/상황)이며, "
+    "(전체적으로 어떤 행위/상황)으로 보입니다.'\n"
+    "Write 2 to 4 sentences. State only what is clearly visible; if a detail is not "
+    "clear, do not invent it. Do NOT restate the category name as a classification "
+    "label.\n"
+    "2) AUDIO_ALERT: A warning message to be broadcast in real time from the patrol "
+    "drone's loudspeaker at the actual scene, consistent with the category and the "
+    "ADMIN_LOG. It MUST do two things: (a) briefly state the detected situation, and "
+    "(b) give a clear, calm directive ordering the people at the scene to stop the "
+    "behavior immediately. You may add that the area is under drone surveillance to "
+    "reinforce deterrence. Write ONE or TWO short sentences, at most 60 Korean "
+    "characters total, in a neutral and authoritative public-broadcast tone. "
+    "Do NOT name or physically describe individuals, do NOT assert legal guilt, and "
+    "do NOT use labels, prefixes, emojis, or special characters.\n\n"
+    "Output rules:\n"
+    "- Write everything in KOREAN (한국어). Do not use English.\n"
+    "- Output EXACTLY the two sections below, using the tags verbatim, and nothing else.\n"
+    "- Reproduce the tags exactly; do not translate or modify them.\n"
+    "- Do NOT add greetings, intros, or thinking logs outside the sections. "
+    "Start immediately with the first tag.\n\n"
+    "Format (follow exactly):\n"
+    "---SECTION_1: ADMIN_LOG---\n"
+    "(...)\n"
+    "---END_SECTION_1---\n\n"
+    "---SECTION_2: AUDIO_ALERT---\n"
+    "(...)\n"
+    "---END_SECTION_2---"
+)
+
+VLM_SYSTEM_PROMPT = VLM_SYSTEM_PROMPT_KO if IS_KO else VLM_SYSTEM_PROMPT_EN
+
+# 방송문·관리자 로그 규격 (환경변수로 조정 가능)
+ADMIN_MAX_SENTENCES = int(os.getenv("VLM_ADMIN_MAX_SENTENCES", "4"))
+# 방송문은 「상황 고지 + 행동 중단 지시」 두 문장이라 한 문장으로 자르면 지시가 날아간다.
+ALERT_MAX_CHARS = int(os.getenv("VLM_ALERT_MAX_CHARS", "60"))       # 한국어는 글자 기준
+ALERT_MAX_SENTENCES = int(os.getenv("VLM_ALERT_MAX_SENTENCES", "2"))
+
 
 def _build_vlm_messages(video_path: str, predicted_category: str) -> list:
     """Qwen3-VL용 메시지 구성 (시스템 프롬프트 + 영상 + 카테고리)"""
@@ -140,7 +207,7 @@ def _build_vlm_messages(video_path: str, predicted_category: str) -> list:
                     "text": (
                         f"[Confirmed category from VideoMAE]: '{predicted_category}'\n"
                         f"Describe the situation in the attached video on the premise of "
-                        f"this category. Write in English."
+                        + ("this category. 한국어로 작성." if IS_KO else "this category. Write in English.")
                     ),
                 },
             ],
@@ -154,11 +221,96 @@ def _grab_section(label: str, end_num: int, text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
+# =========================================================
+# 방송문·관리자 로그 규격화
+#
+# 방송문은 현장 스피커로 그대로 나간다. 예전에는 VLM 출력을 손대지 않고 보내서
+# 「경고: ...」 같은 라벨이나 이모지가 음성으로 읽히고, 길이 제한도 없었다.
+# =========================================================
+def _split_sentences(text: str):
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [x.strip() for x in parts if x.strip()]
+
+
+def _strip_emojis_and_ctrl(text: str) -> str:
+    """제어문자와 이모지류(So/Sk) 제거 — 음성으로 읽히면 안 된다."""
+    out = []
+    for ch in text:
+        cat = unicodedata.category(ch)
+        if cat.startswith("C") or cat in ("So", "Sk"):
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
+def _normalize_admin_log(text: str) -> str:
+    """관리자 로그: 공백 정리 + 문장 수 상한."""
+    cleaned = re.sub(r"\s+", " ", text).strip()
+    sents = _split_sentences(cleaned)
+    if len(sents) > ADMIN_MAX_SENTENCES:
+        sents = sents[:ADMIN_MAX_SENTENCES]
+    return " ".join(sents) if sents else cleaned
+
+
+def _normalize_audio_alert(text: str) -> str:
+    """방송문: 라벨·이모지 제거, 한 문장, 길이 상한."""
+    text = _strip_emojis_and_ctrl(text)
+    # ⚠️ 앞머리 기호를 먼저 턴다. 이모지를 지워도 변형 선택자(U+FE0F) 같은 결합 문자가
+    #    남아 있어, 라벨 정규식의 ^ 가 첫 글자에서 막힌다 —
+    #    그러면 「주의 - …」가 그대로 방송으로 나간다.
+    text = re.sub(r"^[^0-9A-Za-z가-힣]+", "", text)
+    # 선행 라벨만 떼어낸다. 본문에 들어간 같은 낱말은 건드리지 않는다.
+    text = re.sub(
+        r"^\s*(ALERT|WARNING|WARN|NOTICE|CAUTION|ATTENTION|AUDIO[ _]?ALERT|EMERGENCY"
+        r"|경고|주의|알림|안내|긴급)\s*[:\-]\s*",
+        "", text, flags=re.IGNORECASE,
+    )
+    text = re.sub(r"^[^0-9A-Za-z가-힣]+", "", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    sents = _split_sentences(text)
+
+    if IS_KO:
+        # 방송문은 「상황 고지 + 행동 중단 지시」 두 문장이다.
+        # 첫 문장만 남기면 정작 중요한 "멈추라"는 지시가 날아간다.
+        sents = sents[:ALERT_MAX_SENTENCES]
+        # 글자 수 한도는 문장 단위로 채운다 — 문장을 중간에서 끊지 않는다.
+        kept, total = [], 0
+        for one in sents:
+            add = len(one) + (1 if kept else 0)   # 문장 사이 공백 한 칸
+            if total + add > ALERT_MAX_CHARS:
+                break
+            kept.append(one)
+            total += add
+        if kept:
+            text = " ".join(kept)
+        elif sents:
+            # 첫 문장부터 한도를 넘으면 어절 경계에서 자른다
+            cut = sents[0][:ALERT_MAX_CHARS]
+            if " " in cut:
+                cut = cut[:cut.rfind(" ")]
+            text = cut.rstrip(" ,;:")
+    else:
+        text = sents[0] if sents else text
+        words = text.split()
+        if len(words) > 25:
+            text = " ".join(words[:25])
+
+    text = text.strip()
+    if text and text[-1] not in ".!?":
+        text += "."
+    return text
+
+
 def _parse_vlm_sections(answer: str) -> dict:
-    """VLM 원문 → admin_log / audio_alert 분리"""
-    admin_log = _grab_section("ADMIN_LOG", 1, answer) or "Admin log parsing failed."
-    audio_alert = _grab_section("AUDIO_ALERT", 2, answer) or "Audio alert parsing failed."
-    return {"admin_log": admin_log, "audio_alert": audio_alert}
+    """VLM 원문 → admin_log / audio_alert 분리 + 규격화"""
+    fail_log = "관리자 로그 파싱 실패." if IS_KO else "Admin log parsing failed."
+    fail_alert = "경고문 파싱 실패." if IS_KO else "Audio alert parsing failed."
+    admin_log = _grab_section("ADMIN_LOG", 1, answer) or fail_log
+    audio_alert = _grab_section("AUDIO_ALERT", 2, answer) or fail_alert
+    return {
+        "admin_log": _normalize_admin_log(admin_log),
+        "audio_alert": _normalize_audio_alert(audio_alert),
+    }
 
 
 def _run_vlm_inference(video_path: str, predicted_category: str) -> dict:
@@ -209,12 +361,12 @@ def _synthesize_tts(text: str) -> str:
     filename = f"alert_{timestamp}.wav"
     output_path = os.path.join(TTS_OUTPUT_DIR, filename)
 
-    speaker_key = "EN-Default"
+    speaker_key = TTS_SPEAKER
     if speaker_key not in tts_speaker_ids:
         speaker_key = list(tts_speaker_ids.keys())[0]
 
     tts_model.tts_to_file(
-        text.strip(), tts_speaker_ids[speaker_key], output_path, speed=1.0
+        text.strip(), tts_speaker_ids[speaker_key], output_path, speed=TTS_SPEED
     )
     return output_path
 
@@ -261,9 +413,21 @@ async def lifespan(app: FastAPI):
     print("[AI Server] [2/3] Qwen3-VL-4B 로드 완료.")
 
     # 3) MeloTTS (음성 합성)
-    print("[AI Server] [3/3] MeloTTS 로딩...")
+    if IS_KO:
+        # MeloTTS 한국어는 문장 임베딩에 kykim/bert-kor-base 를 쓰는데, 그 저장소에는
+        # pytorch_model.bin 만 있다. transformers 5.x 는 torch 2.6 미만에서 .bin 로딩을
+        # 거부하므로(CVE-2025-32434) 합성이 통째로 실패한다.
+        # → 같은 가중치를 safetensors 로 바꿔 둔 로컬 폴더를 쓰게 한다.
+        #   (허브를 보게 두면 원격 파일 목록을 따라 다시 .bin 을 고른다)
+        if os.path.isdir(BERT_KOR_DIR):
+            import melo.text.korean as _melo_ko
+            _melo_ko.model_id = BERT_KOR_DIR
+            print(f"[AI Server] 한국어 BERT: {BERT_KOR_DIR}")
+        else:
+            print(f"[AI Server] ⚠️ {BERT_KOR_DIR} 없음 — 한국어 합성이 실패할 수 있다")
+    print(f"[AI Server] [3/3] MeloTTS 로딩... (언어={TTS_LANGUAGE}, 속도={TTS_SPEED}, 가중치={_TTS_DIR})")
     tts_model = TTS(
-        language="EN",
+        language=TTS_LANGUAGE,
         device="auto",
         ckpt_path=TTS_CKPT_PATH,
         config_path=TTS_CONFIG_PATH,
