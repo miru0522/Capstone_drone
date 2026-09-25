@@ -1,6 +1,7 @@
 package com.drone.backend.controller;
 
 import com.drone.backend.domain.EventLog;
+import com.drone.backend.config.AnalysisLog;
 import com.drone.backend.repository.EventLogRepository;
 import com.drone.backend.service.TtsService;
 import com.drone.backend.repository.DroneRepository;
@@ -107,11 +108,13 @@ public class EventController {
             @RequestPart("video") MultipartFile video,
             @RequestPart(value = "audio", required = false) MultipartFile audio,
             @RequestPart("eventData") String eventDataStr) {
-        log.info("📹 [REST] FastAPI로부터 비디오 및 이벤트 데이터 수신 시작");
+        AnalysisLog.start("backend_receive");
         try {
             // 1. JSON 파싱
             ObjectMapper mapper = new ObjectMapper();
             Map<String, Object> eventData = mapper.readValue(eventDataStr, new TypeReference<Map<String, Object>>() {});
+
+            AnalysisLog.done("backend_receive", Map.of("video_bytes", video.getSize(), "audio_present", audio != null && !audio.isEmpty()));
 
             // 2. 비디오 저장 경로 설정 (WebConfig 매핑 기준인 프로젝트 루트의 videodata/)
             String originalFilename = video.getOriginalFilename();
@@ -119,6 +122,7 @@ public class EventController {
                 originalFilename = System.currentTimeMillis() + "_video.mp4";
             }
             
+            AnalysisLog.start("backend_video_store");
             String uploadDir = System.getProperty("user.dir") + "/videodata/";
             File dir = new File(uploadDir);
             if (!dir.exists()) {
@@ -126,6 +130,8 @@ public class EventController {
             }
             File dest = new File(uploadDir + originalFilename);
             video.transferTo(dest);
+            AnalysisLog.done("backend_video_store", Map.of("bytes", video.getSize()));
+            AnalysisLog.start("event_mapping");
             
             // 상대 경로 생성
             String videoUrl = "/media/" + originalFilename;
@@ -168,8 +174,11 @@ public class EventController {
                 }
             }
 
+            AnalysisLog.done("event_mapping", Map.of());
+
             // 2.5 오디오(TTS) 저장 경로 설정
             if (audio != null && !audio.isEmpty()) {
+                AnalysisLog.start("backend_audio_store");
                 String audioFilename = audio.getOriginalFilename();
                 if (audioFilename == null || audioFilename.isEmpty()) {
                     audioFilename = System.currentTimeMillis() + "_audio.wav";
@@ -183,11 +192,18 @@ public class EventController {
                 audio.transferTo(audioDest);
                 
                 logEvent.setAudioFilePath("/wavdata/" + audioFilename);
+                AnalysisLog.done("backend_audio_store", Map.of("bytes", audio.getSize()));
+            } else {
+                AnalysisLog.skip("backend_audio_store");
             }
 
+            AnalysisLog.start("db_save");
             logEvent = eventLogRepository.save(logEvent);
+            AnalysisLog.saved(logEvent.getEventId());
 
-            log.info("✅ [REST] 이벤트 DB 저장 완료. ID: {}", logEvent.getEventId());
+            AnalysisLog.done("db_save", AnalysisLog.values(logEvent.getDroneId(), logEvent.getSecondClassificationResult(),
+                    logEvent.getFirstAnomalyScore(), logEvent.getSecondAnomalyScore(),
+                    vadObj != null ? "vadScore" : eventData.get("score") != null ? "score" : "missing"));
 
             // 4. STOMP 대시보드 알림 브로드캐스트
             Map<String, Object> alertData = new HashMap<>();
@@ -204,13 +220,14 @@ public class EventController {
             alertData.put("videoUrl", videoUrl);
             alertData.put("time", java.time.LocalTime.now().toString());
 
+            AnalysisLog.start("alert_publish");
             messagingTemplate.convertAndSend("/topic/events", alertData);
-            log.info("🚀 [STOMP] 대시보드로 알림 송출 완료");
+            AnalysisLog.done("alert_publish", Map.of("channel", "/topic/events", "screen_display", "unknown"));
 
             return ResponseEntity.ok("이벤트 접수 및 브로드캐스트 성공. (ID: " + logEvent.getEventId() + ")");
             
         } catch (Exception e) {
-            log.error("❌ 비디오 이벤트 수신 실패", e);
+            AnalysisLog.failed(e);
             return ResponseEntity.status(500).body("Error: " + e.getMessage());
         }
     }

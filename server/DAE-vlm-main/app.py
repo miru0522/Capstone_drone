@@ -38,6 +38,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import requests
+import analysis_logging as al
 
 # =========================================================
 # 경로 설정
@@ -305,8 +306,16 @@ def _parse_vlm_sections(answer: str) -> dict:
     """VLM 원문 → admin_log / audio_alert 분리 + 규격화"""
     fail_log = "관리자 로그 파싱 실패." if IS_KO else "Admin log parsing failed."
     fail_alert = "경고문 파싱 실패." if IS_KO else "Audio alert parsing failed."
-    admin_log = _grab_section("ADMIN_LOG", 1, answer) or fail_log
-    audio_alert = _grab_section("AUDIO_ALERT", 2, answer) or fail_alert
+    raw_admin = _grab_section("ADMIN_LOG", 1, answer)
+    raw_audio = _grab_section("AUDIO_ALERT", 2, answer)
+    admin_log = raw_admin or fail_log
+    audio_alert = raw_audio or fail_alert
+    if not raw_admin or not raw_audio:
+        al.degraded()
+    al.emit("qwen_parse_quality", "completed", level="INFO" if raw_admin and raw_audio else "WARN",
+            admin_parse_ok=bool(raw_admin), audio_parse_ok=bool(raw_audio),
+            fallback_used=not (bool(raw_admin) and bool(raw_audio)),
+            admin_length=len(raw_admin), audio_length=len(raw_audio))
     return {
         "admin_log": _normalize_admin_log(admin_log),
         "audio_alert": _normalize_audio_alert(audio_alert),
@@ -318,22 +327,28 @@ def _run_vlm_inference(video_path: str, predicted_category: str) -> dict:
     import torch
     from qwen_vl_utils import process_vision_info
 
-    messages = _build_vlm_messages(video_path, predicted_category)
-    text = vlm_processor.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-    image_inputs, video_inputs = process_vision_info(messages)
-    inputs = vlm_processor(
-        text=[text],
-        images=image_inputs,
-        videos=video_inputs,
-        padding=True,
-        return_tensors="pt",
-    ).to("cuda" if torch.cuda.is_available() else "cpu")
+    with al.stage("qwen_prepare"):
+        messages = _build_vlm_messages(video_path, predicted_category)
+        text = vlm_processor.apply_chat_template(
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        image_inputs, video_inputs = process_vision_info(messages)
+        inputs = vlm_processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+        ).to("cuda" if torch.cuda.is_available() else "cpu")
 
+    al.start("qwen_lock")
     with INFERENCE_LOCK:
+        al.done("qwen_lock")
+        sync_started = time.perf_counter()
         if torch.cuda.is_available():
             torch.cuda.synchronize()
+        al.emit("qwen_sync", "completed", duration_ms=(time.perf_counter() - sync_started) * 1000)
+        al.start("qwen_generate")
         t0 = time.perf_counter()
         with torch.no_grad():
             generated_ids = vlm_model.generate(
@@ -342,13 +357,15 @@ def _run_vlm_inference(video_path: str, predicted_category: str) -> dict:
         if torch.cuda.is_available():
             torch.cuda.synchronize()
         infer_sec = round(time.perf_counter() - t0, 3)
+        al.done("qwen_generate", generate_ms=infer_sec * 1000)
 
-    trimmed = [out[len(inp) :] for inp, out in zip(inputs["input_ids"], generated_ids)]
-    answer = vlm_processor.batch_decode(
-        trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-    )[0].strip()
+    with al.stage("qwen_parse"):
+        trimmed = [out[len(inp) :] for inp, out in zip(inputs["input_ids"], generated_ids)]
+        answer = vlm_processor.batch_decode(
+            trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
+        )[0].strip()
 
-    result = _parse_vlm_sections(answer)
+        result = _parse_vlm_sections(answer)
     result["raw"] = answer
     result["inference_seconds"] = infer_sec
     return result
@@ -437,6 +454,7 @@ async def lifespan(app: FastAPI):
 
     os.makedirs(TTS_OUTPUT_DIR, exist_ok=True)
     print("[AI Server] 모든 모델 로딩 완료!")
+    al.configure_model([VIDEOMAE_BINARY_CKPT, VIDEOMAE_SUB_CKPT, QWEN_MODEL_PATH, TTS_CKPT_PATH], VLM_SYSTEM_PROMPT)
 
     yield  # ← 서버 실행 구간
 
@@ -590,7 +608,7 @@ def _to_browser_mp4(src_path: str) -> str:
         if os.path.getsize(out_path) > 0:
             return out_path
     except Exception as e:
-        print(f"[AI Server] 브라우저용 변환 실패, 원본을 보낸다: {e}")
+        al.fail("video_convert", e, level="WARN")
     return src_path
 
 
@@ -610,58 +628,57 @@ async def analyze_video_pipeline(
     # finally에서 참조하므로 try 진입 전에 정의해 둔다 (NameError 방지)
     temp_video_path = None
     web_video_path = None
+    tts_wav_path = None
+    al.done("input", input=al.snapshot({"droneId": drone_id, **({"vadScore": anomaly_score} if anomaly_score is not None else {})}))
 
     try:
         # 1. 파일 임시 저장
-        temp_dir = tempfile.gettempdir()
-        temp_video_path = os.path.join(temp_dir, video.filename)
-        with open(temp_video_path, "wb") as buffer:
-            buffer.write(await video.read())
-        print(f"[AI Server] 영상 수신: {video.filename}")
+        with al.stage("temp_store"):
+            temp_dir = tempfile.gettempdir()
+            temp_video_path = os.path.join(temp_dir, video.filename)
+            with open(temp_video_path, "wb") as buffer:
+                buffer.write(await video.read())
+            al.emit("video_received", "completed", **al.file_info(temp_video_path))
 
         # 2. 파이프라인 실행
         tts_wav_path = None
 
         # --- [Step 1] VideoMAE V2: 계층 분류 ---
-        print("[AI Server] [Step 1/3] VideoMAE 분류 시작...")
-        mae_result = videomae_classifier.predict(temp_video_path)
+        al.start("videomae")
+        mae_result = videomae_classifier.predict(temp_video_path, observer=al)
 
         if mae_result["status"] != "ok":
+            al.emit("videomae", "failed", level="ERROR", reason_code="wrapper_error")
             raise Exception(f"VideoMAE 추론 실패: {mae_result.get('error', 'unknown')}")
 
         category = mae_result["result"]["category"]
         category_id = mae_result["result"]["category_id"]
         confidence = mae_result["result"]["confidence"]
         is_anomaly = mae_result["result"]["is_anomaly"]
-        print(
-            f"[AI Server] [Step 1/3] VideoMAE 결과: {category} "
-            f"(ID: {category_id}, 신뢰도: {confidence:.4f}, 이상: {is_anomaly})"
-        )
+        al.done("videomae", result=mae_result["result"],
+                decision_rule="binary_argmax_then_subclass_argmax")
 
         # --- [Step 2] Qwen3-VL: 상황 설명 (이상 판정 시에만 실행) ---
         admin_log = "순찰 이상 없음."
         audio_alert = "Patrol area clear, no anomalies detected."
 
         if is_anomaly:
-            print("[AI Server] [Step 2/3] Qwen3-VL 상황 설명 생성 시작...")
+            al.start("qwen")
             video_abs_path = os.path.abspath(temp_video_path)
             vlm_result = _run_vlm_inference(video_abs_path, category)
             admin_log = vlm_result["admin_log"]
             audio_alert = vlm_result["audio_alert"]
-            print(
-                f"[AI Server] [Step 2/3] VLM 완료 "
-                f"({vlm_result['inference_seconds']}s)"
-            )
+            al.done("qwen", admin_length=len(admin_log), audio_length=len(audio_alert))
         else:
-            print("[AI Server] [Step 2/3] 정상 판정 → VLM 생략")
+            al.skip("qwen")
 
         # --- [Step 3] MeloTTS: 음성 합성 (이상 판정 시에만 실행) ---
         if is_anomaly:
-            print("[AI Server] [Step 3/3] MeloTTS 음성 합성 시작...")
+            al.start("tts_auto")
             tts_wav_path = _synthesize_tts(audio_alert)
-            print(f"[AI Server] [Step 3/3] TTS 완료: {tts_wav_path}")
+            al.done("tts_auto", **al.file_info(tts_wav_path))
         else:
-            print("[AI Server] [Step 3/3] 정상 판정 → TTS 생략")
+            al.skip("tts_auto")
 
         event_data_dict = {
             "droneId": drone_id,
@@ -679,21 +696,28 @@ async def analyze_video_pipeline(
         # 이전에는 REAL 분기 안에만 있어서 MOCK_MODE로 E2E 검증할 때
         # vadScore·label 주입이 조용히 무시됐다.
         # (가상 드론 설계의 1차 점수 동봉이 이 경로에 의존한다)
+        al.start("metadata_merge")
+        before_metadata = dict(event_data_dict)
         if eventData:
             try:
                 parsed = json.loads(eventData)
                 event_data_dict.update(parsed)
             except Exception as parse_err:
-                print(f"[AI Server] eventData 파싱 실패, 무시함: {parse_err}")
+                al.degraded()
+                al.fail("metadata_merge", parse_err, level="WARN")
 
         event_data = event_data_dict
+        al.metadata_done(before_metadata, event_data)
+        al.done("submission_payload", submitted=al.snapshot(event_data))
 
         # 3. Spring Boot 서버로 릴레이 전송
         backend_url = f"{BACKEND_URL}/events"
-        headers = {"X-Device-Key": DEVICE_KEY}
+        headers = {"X-Device-Key": DEVICE_KEY, "X-Analysis-Id": al.analysis_id() or ""}
 
         # 분석은 원본으로 했다. 저장·재생용으로만 브라우저가 읽는 형식으로 바꾼다.
+        al.start("video_convert")
         web_video_path = _to_browser_mp4(temp_video_path)
+        al.conversion_done(web_video_path != temp_video_path, al.file_info(web_video_path))
 
         with open(web_video_path, "rb") as vf:
             files = {"video": (video.filename, vf, "video/mp4")}
@@ -710,14 +734,14 @@ async def analyze_video_pipeline(
 
             data = {"eventData": json.dumps(event_data)}
 
-            print(f"[AI Server] Spring Boot 릴레이 전송 중... ({backend_url})")
+            al.start("backend_submit", attempt=1, target_path="/events", video=al.file_info(web_video_path), audio=al.file_info(tts_wav_path))
             response = requests.post(backend_url, files=files, data=data, headers=headers, verify=False)
 
             if audio_file_handle:
                 audio_file_handle.close()
 
+        al.backend_response(response.status_code)
         if response.status_code == 200:
-            print("[AI Server] 백엔드 전송 성공")
             
             return {
                 "status": "success",
@@ -726,26 +750,27 @@ async def analyze_video_pipeline(
                 "backend_response": response.text,
             }
         else:
-            print(
-                f"[AI Server] 백엔드 전송 실패: "
-                f"{response.status_code} - {response.text}"
-            )
             raise HTTPException(
                 status_code=response.status_code,
                 detail=f"Backend Error: {response.text}",
             )
 
     except Exception as e:
-        print(f"[AI Server] 파이프라인 에러: {str(e)}")
+        al.fail_active(e)
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
         # [수정 2026-08-05] 임시 mp4 정리를 finally로 이동.
         # 이전에는 해피패스에만 있어서 추론·릴레이 도중 예외가 나면
         # 업로드된 클립이 temp에 계속 쌓였다.
+        al.start("cleanup")
         try:
             for p in (temp_video_path, web_video_path):
                 if p and os.path.exists(p):
                     os.remove(p)
+            al.done("cleanup", wav_retained=tts_wav_path is not None, wav=al.file_info(tts_wav_path))
         except OSError as cleanup_err:
-            print(f"[AI Server] 임시 파일 삭제 실패: {cleanup_err}")
+            al.fail("cleanup", cleanup_err, level="WARN")
+
+# 최외곽 관측: FastAPI의 오류 응답 전송까지 기록한다.
+app = al.AnalysisMiddleware(app)

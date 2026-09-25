@@ -1,0 +1,11 @@
+AST_OK
+AST_OK
+AST_OK
+VERIFIED DAE-vlm-main/analysis_logging.py
+VERIFIED DAE-vlm-main/app.py
+VERIFIED DAE_Backend-main/src/main/java/com/drone/backend/config/AnalysisLog.java
+VERIFIED DAE_Backend-main/src/main/java/com/drone/backend/config/AnalysisLogFilter.java
+VERIFIED DAE_Backend-main/src/main/java/com/drone/backend/controller/EventController.java
+VERIFIED compose.analysis-logging.yml
+VERIFIED DAE-vlm-main/weights/videomae/videomae_infer.py
+All approved source bytes and original backups verified; no model imports or service restart.

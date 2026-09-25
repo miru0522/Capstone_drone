@@ -24,6 +24,7 @@ videomae_infer.py — Server 2차 분류(VideoMAE V2-Base, 계층 분류) 추론
 """
 from __future__ import annotations
 import time
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
@@ -87,19 +88,23 @@ def _sample_indices(n: int, k: int = NUM_FRAMES) -> np.ndarray:
     return np.clip((np.arange(k) * step + step / 2.0).astype(np.int64), 0, n - 1)
 
 
-def _frames_from_mp4(path: str) -> np.ndarray:
+def _frames_from_mp4(path: str, observer=None) -> np.ndarray:
     from decord import VideoReader, cpu
     vr = VideoReader(path, ctx=cpu(0))
     idx = _sample_indices(len(vr))
+    if observer:
+        observer.emit("video_frames", "completed", original_frames=len(vr), sampled_frames=len(idx))
     return vr.get_batch(idx).asnumpy()           # (T,H,W,3) RGB uint8
 
 
-def _frames_from_dir(path: str) -> np.ndarray:
+def _frames_from_dir(path: str, observer=None) -> np.ndarray:
     import cv2
     jpgs = sorted(Path(path).glob("*.jpg"), key=lambda p: int(p.stem) if p.stem.isdigit() else 0)
     if not jpgs:
         raise FileNotFoundError(f"no jpg in {path}")
     idx = _sample_indices(len(jpgs))
+    if observer:
+        observer.emit("video_frames", "completed", original_frames=len(jpgs), sampled_frames=len(idx))
     out = []
     for i in idx:
         im = cv2.imread(str(jpgs[int(i)]))
@@ -124,16 +129,21 @@ class VideoMAEHierClassifier:
         self.binary_ckpt, self.sub_ckpt = binary_ckpt, sub_ckpt
 
     @torch.no_grad()
-    def predict(self, clip_path: str, event_id: str | None = None) -> dict:
+    def predict(self, clip_path: str, event_id: str | None = None, observer=None) -> dict:
         t0 = time.time()
         try:
-            p = str(clip_path)
-            frames = _frames_from_dir(p) if Path(p).is_dir() else _frames_from_mp4(p)
-            x = _preprocess(frames, self.device)
+            with observer.stage("video_decode_preprocess") if observer else nullcontext():
+                p = str(clip_path)
+                frames = _frames_from_dir(p, observer) if Path(p).is_dir() else _frames_from_mp4(p, observer)
+                x = _preprocess(frames, self.device)
+                if observer:
+                    observer.emit("video_input", "completed", sampled_frames=len(frames), input_shape=list(x.shape))
 
-            pb = torch.softmax(self.binary(x), dim=-1)[0]            # [p_normal, p_anomaly]
-            p_normal, p_anom = float(pb[0]), float(pb[1])
-            ps = torch.softmax(self.sub(x), dim=-1)[0].cpu().numpy() # 4-class
+            with observer.stage("videomae_binary") if observer else nullcontext():
+                pb = torch.softmax(self.binary(x), dim=-1)[0]            # [p_normal, p_anomaly]
+                p_normal, p_anom = float(pb[0]), float(pb[1])
+            with observer.stage("videomae_subclass") if observer else nullcontext():
+                ps = torch.softmax(self.sub(x), dim=-1)[0].cpu().numpy() # 4-class
 
             # 통합 5-class 확률: 정상=p_normal, 이상 k = p_anomaly * p_sub(k)
             scores5 = [p_normal] + [p_anom * float(ps[k]) for k in range(4)]
@@ -166,6 +176,8 @@ class VideoMAEHierClassifier:
                 "latency_ms": int((time.time() - t0) * 1000),
             }
         except Exception as e:
+            if observer:
+                observer.fail("videomae", e)
             return {"schema_version": SCHEMA_VERSION, "status": "error",
                     "event_id": event_id, "error": f"{type(e).__name__}: {e}",
                     "latency_ms": int((time.time() - t0) * 1000)}

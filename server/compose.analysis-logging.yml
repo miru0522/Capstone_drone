@@ -1,0 +1,14 @@
+# 운영 활성화 시 기존 compose와 함께 사용. 이 파일 자체로 서비스를 재시작하지 않는다.
+services:
+  ai_server:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+  backend:
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"

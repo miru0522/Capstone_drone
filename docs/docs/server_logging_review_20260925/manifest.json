@@ -1,0 +1,38 @@
+[
+  {
+    "path": "server/DAE-vlm-main/analysis_logging.py",
+    "sha256": "F48E78B255E820FE2941F21F1227E0CA923A5701F9946B06C48CD758268E0356"
+  },
+  {
+    "path": "server/DAE-vlm-main/app.py",
+    "sha256": "72E170D4409338CCFD2F6C3C8F4EBCD1B50667D0757D6483B47448564C2F7E5B"
+  },
+  {
+    "path": "server/DAE-vlm-main/tests/test_analysis_logging.py",
+    "sha256": "AACEFF94A7115F5388F4DBCBB2F9954DCBDBAA790BA4489C45F7DA4092713AE6"
+  },
+  {
+    "path": "server/DAE_Backend-main/src/main/java/com/drone/backend/config/AnalysisLog.java",
+    "sha256": "947831ED47120FCB66498C075C1E36715F8A18541E0B0EB784F120865AD2709B"
+  },
+  {
+    "path": "server/DAE_Backend-main/src/main/java/com/drone/backend/config/AnalysisLogFilter.java",
+    "sha256": "AE56D9777F46207BAD57566764045B31772E0248542470F24CDA274FE0F72C3C"
+  },
+  {
+    "path": "server/DAE_Backend-main/src/main/java/com/drone/backend/controller/EventController.java",
+    "sha256": "9591BAB63A2253E61D7BD9F1664855DA027B11BA8234CC98FBF68E842C9C871B"
+  },
+  {
+    "path": "server/DAE_Backend-main/src/test/java/com/drone/backend/AnalysisLoggingTests.java",
+    "sha256": "CEFCEB51CCA33DDEE95186173D7C204299767EF95FB42B5979995DD5612DD55C"
+  },
+  {
+    "path": "server/compose.analysis-logging.yml",
+    "sha256": "2478779E2A5A70C69881A0648CE9FBD52E25811E7F16B5BCF02EBDA273551CB6"
+  },
+  {
+    "path": "server/runtime_sources/videomae/videomae_infer.py",
+    "sha256": "93D60B8307D0706DF2A2299BA9F6F94D9B3250CBD90935293550B322F2472173"
+  }
+]
