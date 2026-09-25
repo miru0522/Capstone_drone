@@ -1,0 +1,10 @@
+2026-09-25 22:01:22,935 [WARNING] main: [TestInject] ⚠️ 테스트 모드 진입: 7초간 카메라 대신 '/home/hpc/drone_2026/video/top5_both_models/01_Violence_Assault_Assault006_x264.mp4' 프레임을 주입합니다 (실제 카메라 입력 아님, 원본 fps=30.00)
+2026-09-25 22:01:28,602 [INFO] main: ⚠️ 이상 감지 트리거 발생 (score=0.985)
+2026-09-25 22:01:28,749 [WARNING] main: [Hover] 이상 감지 호버 요청 제출 (requestId=f43159ac69664745a7cd5271f2385d65)
+2026-09-25 22:01:28,836 [INFO] main: 영상 전송 job 제출 완료 (frames=81); VadCLIP inference worker는 계속 동작
+2026-09-25 22:01:28,837 [INFO] main: 영상 전송 시작 (frames=81, score=0.985, 서버 응답 최대 180초)
+2026-09-25 22:01:28,837 [INFO] main: [Hover] 호버링 유지 중 - 관제사 명령 무한 대기 (command_receiver.py 경유)
+2026-09-25 22:01:29,943 [WARNING] main: [TestInject] 테스트 모드 종료 - 실제 카메라로 복귀
+2026-09-25 22:01:31,004 [INFO] uploader: mp4v 인코딩 완료: frames=81, fps=9, size=5510253 bytes
+2026-09-25 22:04:23,430 [ERROR] uploader: [동기전송] 요청 오류: ('Connection aborted.', RemoteDisconnected('Remote end closed connection without response'))
+2026-09-25 22:04:23,435 [WARNING] main: 서버 응답 없음/실패

@@ -1,0 +1,3 @@
+2026/09/25 13:01:31 [warn] 33#33: *4059 a client request body is buffered to a temporary file /var/cache/nginx/client_temp/0000000370, client: 203.249.90.20, server: localhost, request: "POST /analyze-video HTTP/1.1", host: "203.249.90.3:8031"
+203.249.90.20 - - [25/Sep/2026:13:02:09 +0000] "GET /ws HTTP/1.1" 101 41 "-" "-" "-"
+203.249.90.20 - - [25/Sep/2026:13:02:42 +0000] "POST /analyze-video HTTP/1.1" 408 0 "-" "python-requests/2.32.4" "-"
