@@ -1,0 +1,26 @@
+15-minute post-deployment monitor log (2026-09-25, UTC timestamps in log lines)
+Command: docker compose -f docker-compose.yml -f compose.analysis-logging.yml up -d --build ai_server backend
+Window: 2026-09-25T09:10 ~ 09:25 UTC (18:10 ~ 18:26 KST)
+Filter pattern: error|exception|traceback|panic|out of memory|refused|status=5xx|failed (case-insensitive), applied every 20s to `docker logs --since 20s` for both dae_ai_server and dae_backend
+
+2026-09-25T09:10:46.408Z  INFO 1 --- [drone-backend] [MessageBroker-1] o.s.w.s.c.WebSocketMessageBrokerStats    : WebSocketSession[2 current WS(2)-HttpStream(0)-HttpPoll(0), 2 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(2)-CONNECTED(2)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 64, active threads = 0, queued tasks = 0, completed tasks = 180], outboundChannel[pool size = 3, active threads = 0, queued tasks = 0, completed tasks = 3], sockJsScheduler[pool size = 1, active threads = 1, queued tasks = 0, completed tasks = 0]
+2026-09-25T09:10:54.256Z ERROR 1 --- [drone-backend] [nio-8080-exec-2] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:15:29.793Z ERROR 1 --- [drone-backend] [nio-8080-exec-4] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:18:25.422Z ERROR 1 --- [drone-backend] [nio-8080-exec-7] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:20:23.726Z ERROR 1 --- [drone-backend] [nio-8080-exec-2] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:20:23.726Z ERROR 1 --- [drone-backend] [nio-8080-exec-2] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:21:25.858Z DEBUG 1 --- [drone-backend] [nio-8080-exec-7] s.w.s.h.LoggingWebSocketHandlerDecorator : Transport error in StandardWebSocketSession[id=bcba5c1d-b9f0-5abb-000c-7529e9ef821d, uri=wss://203.249.90.3/ws]
+java.io.IOException: Unable to unwrap data, invalid status [CLOSED]
+2026-09-25T09:21:31.096Z ERROR 1 --- [drone-backend] [nio-8080-exec-7] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:22:33.468Z DEBUG 1 --- [drone-backend] [nio-8080-exec-2] s.w.s.h.LoggingWebSocketHandlerDecorator : Transport error in StandardWebSocketSession[id=87e0ba8b-f569-6196-3de8-1e09cdc8d301, uri=wss://203.249.90.3/ws]
+java.io.IOException: Unable to unwrap data, invalid status [CLOSED]
+2026-09-25T09:22:39.882Z ERROR 1 --- [drone-backend] [nio-8080-exec-4] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+2026-09-25T09:25:40.629Z ERROR 1 --- [drone-backend] [nio-8080-exec-1] com.drone.backend.config.JwtFilter       : JWT 토큰이 헤더와 쿠키 모두에 없습니다.
+=== monitor window done Fri Sep 25 18:26:04 JST 2026 ===
+
+Post-window state:
+/dae_ai_server: RestartCount=0 Status=running
+/dae_backend: RestartCount=0 Status=running
+LogConfig (both): json-file, max-size=20m, max-file=5
+ai_server /docs -> HTTP 200
+backend /events -> HTTP 400 (unauthenticated/no-params GET, expected)
