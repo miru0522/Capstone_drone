@@ -15,27 +15,33 @@ class UploadStartupLoggingTests(unittest.TestCase):
     def test_mode_b_logs_info_once_without_warning(self):
         with mock.patch.object(main.logger, "info") as info_log, \
                 mock.patch.object(main.logger, "warning") as warning_log:
-            main.log_upload_configuration("B", "http://server/analyze-video", "DR-01")
+            main.log_upload_configuration(
+                "B", "http://server/analyze-video", "DR-01", "h264"
+            )
 
         info_log.assert_called_once_with(
-            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s",
+            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s, encoder=%s",
             "B",
             "DR-01",
             "http://server/analyze-video",
+            "h264",
         )
         warning_log.assert_not_called()
 
     def test_mode_a_logs_video_only_warning(self):
         with mock.patch.object(main.logger, "info") as info_log, \
                 mock.patch.object(main.logger, "warning") as warning_log:
-            main.log_upload_configuration("A", "http://server/analyze-video", "DR-01")
+            main.log_upload_configuration(
+                "A", "http://server/analyze-video", "DR-01", "mp4v"
+            )
 
         warning_log.assert_called_once_with(
-            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s "
+            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s, encoder=%s "
             "(영상 전용 구버전 호환 모드)",
             "A",
             "DR-01",
             "http://server/analyze-video",
+            "mp4v",
         )
         info_log.assert_not_called()
 
@@ -55,6 +61,25 @@ class UploadStartupLoggingTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn(
             "UPLOAD_MODE는 A 또는 B여야 함",
+            result.stdout + result.stderr,
+        )
+
+    def test_invalid_clip_encoder_fails_during_import(self):
+        env = os.environ.copy()
+        env["CLIP_ENCODER"] = "invalid"
+        result = subprocess.run(
+            [sys.executable, "-c", "import uploader"],
+            cwd=Path(__file__).resolve().parent,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "CLIP_ENCODER는 mp4v 또는 h264여야 함",
             result.stdout + result.stderr,
         )
 

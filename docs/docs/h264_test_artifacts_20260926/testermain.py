@@ -29,7 +29,10 @@ import cv2
 import numpy as np
 import requests
 from ring_buffer import RingBuffer, FrameEntry, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
-from uploader import ANALYZE_URL, CLIP_ENCODER, DRONE_ID, UPLOAD_MODE, upload_clip_sync
+from uploader import ANALYZE_URL, DRONE_ID, UPLOAD_MODE, upload_clip_sync
+import uploader as _uploader
+import h264enctest as _h264enctest
+_uploader.encode_frames_to_mp4 = _h264enctest.encode_frames_to_mp4_hw  # 하드웨어 인코더 테스트용 몽키패치 (testermain.py 전용)
 from anomaly_model_trt import AnomalyPipeline
 from state_store import atomic_write_json, read_json, update_json
 
@@ -37,32 +40,29 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
-logger = logging.getLogger("main")
+logger = logging.getLogger("testermain")
 
 
 def log_upload_configuration(
     mode: str = UPLOAD_MODE,
     analyze_url: str = ANALYZE_URL,
     drone_id: str = DRONE_ID,
-    clip_encoder: str = CLIP_ENCODER,
 ) -> None:
     """카메라 초기화 전에 실제 분석 업로드 설정을 한 번 기록한다."""
     if mode == "A":
         logger.warning(
-            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s, encoder=%s "
+            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s "
             "(영상 전용 구버전 호환 모드)",
             mode,
             drone_id,
             analyze_url,
-            clip_encoder,
         )
     else:
         logger.info(
-            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s, encoder=%s",
+            "분석 업로드 설정: mode=%s, drone_id=%s, url=%s",
             mode,
             drone_id,
             analyze_url,
-            clip_encoder,
         )
 
 # V6: live CSI / VadCLIP input resolution is unchanged.
