@@ -1,0 +1,16 @@
+diff --git a/jetson/code/uploader.py b/jetson/code/uploader.py
+--- a/jetson/code/uploader.py
++++ b/jetson/code/uploader.py
+@@ -66,3 +66,3 @@ H264_STATE_PATH = os.environ.get(
+ H264_STATE_PATH = os.environ.get(
+-    "H264_STATE_PATH", "/tmp/drone_clip_encoder_state.json"
++    "H264_STATE_PATH", os.path.join(H264_RAW_DIR, "drone_clip_encoder_state.json")
+ )
+@@ -473,5 +473,6 @@ def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
+         if H264_WORKER_MODE == "per_event":
+             process = _run_per_event_worker(command, remaining, partial_path)
+         else:
+-            response_path = final_path + ".response.json"
++            # response는 일회성 IPC 파일이다. raw 경로와 같은 tmpfs에 둔다.
++            response_path = raw_path + ".response.json"
+             request = {
