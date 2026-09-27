@@ -1,0 +1,30 @@
+mp4v와 H264 shm/shm 실제 함수 경계 비교 결과를 최종 단계 검수하라.
+
+읽을 파일:
+- docs/docs/h264_stage1_boundary_results_20260927/README.md
+- docs/docs/h264_stage1_boundary_results_20260927/results.jsonl
+- docs/docs/h264_stage1_boundary_results_20260927/analysis.json
+- docs/docs/h264_stage1_boundary_results_20260927/environment.txt
+- docs/docs/h264_stage1_boundary_results_20260927/tegrastats.log
+- docs/docs/h264_test_artifacts_20260926/stage1_mp4v_vs_h264_boundary.py
+- docs/docs/h264_test_artifacts_20260926/analyze_stage1_boundary.py
+- jetson/code/uploader.py
+- docs/docs/H264지속Worker_20퍼센트감축_조건연구_20260927.md
+
+검수 질문:
+1. p50/p95/max, 단축률, 파일 크기 감소율, worker 수치, 메모리와 운영 중첩을 원시 데이터에서 재계산해 맞는지 확인하라.
+2. 실제 함수 경계 비교가 공정하며 H264에 유리한 누락이 없는가?
+3. p50 46.01%, 방향성 p95 28.78%로 "1단계 20% 선별 통과"라고 표현해도 되는가?
+4. cold와 tail 해석, 파일 크기 비교, 운영 무교란 주장의 한계가 정확히 쓰였는가?
+5. 굳이 남길 필요 없는 후보/시험, 오류, 빠진 위험을 찾아라.
+6. 다음 단계의 우선순위를 정하라. main.py 실행 중 가능한 짧은 시험과 비행 없는 유지보수 시간에만 가능한 시험을 분리하라.
+
+출력 형식:
+- 판정 APPROVE/REVISE
+- 재계산
+- MUST
+- SHOULD
+- 1단계 채택/기각 결론
+- 승인된 다음 단계
+
+파일은 수정하지 말고 한국어로 답하라.

@@ -1,0 +1,140 @@
+{
+  "encode_count": 80,
+  "main_pid_all_alive": true,
+  "main_trigger_total": 0,
+  "main_mp4v_encode_total": 0,
+  "main_upload_start_total": 0,
+  "memory": {
+    "mem_available_min_kib": 1594568,
+    "mem_available_max_kib": 1953008,
+    "swap_used_min_kib": 1091840,
+    "swap_used_max_kib": 1101312,
+    "shm_free_min_bytes": 3582382080
+  },
+  "conditions": {
+    "state_shm_response_shm": {
+      "total_sec": {
+        "p50": 1.0614409289955802,
+        "p95": 1.6247691360040335,
+        "max": 1.919992947994615
+      },
+      "worker_encode_sec": {
+        "p50": 0.833285976004845,
+        "p95": 1.3749619129957864,
+        "max": 1.5003207600020687
+      },
+      "non_worker_sec": {
+        "p50": 0.23024858799908543,
+        "p95": 0.2900964899963583,
+        "max": 0.41967218799254624
+      },
+      "succeeded_tail_sec": {
+        "p50": 0.06551057649994618,
+        "p95": 0.06752657899778569,
+        "max": 0.06827638899994781
+      },
+      "response_write_to_parent_return_sec": {
+        "p50": 0.006567297998117283,
+        "p95": 0.010103014996275306,
+        "max": 0.010143177001737058
+      },
+      "count": 20,
+      "paths_valid": true,
+      "status_all_ok": true,
+      "p50_improvement_vs_tmp_tmp_percent": 26.856638500267817
+    },
+    "state_shm_response_tmp": {
+      "total_sec": {
+        "p50": 1.208964580000611,
+        "p95": 1.3417679080012022,
+        "max": 1.3421170790024917
+      },
+      "worker_encode_sec": {
+        "p50": 0.8336056049993203,
+        "p95": 0.9638890269998228,
+        "max": 0.9710961279997719
+      },
+      "non_worker_sec": {
+        "p50": 0.37432144499689457,
+        "p95": 0.3892595710058231,
+        "max": 0.4043923299977905
+      },
+      "succeeded_tail_sec": {
+        "p50": 0.06567527449806221,
+        "p95": 0.07287046799319796,
+        "max": 0.08639838600356597
+      },
+      "response_write_to_parent_return_sec": {
+        "p50": 0.15328830999715137,
+        "p95": 0.15739185200072825,
+        "max": 0.15801631200156407
+      },
+      "count": 20,
+      "paths_valid": true,
+      "status_all_ok": true,
+      "p50_improvement_vs_tmp_tmp_percent": 16.690857776669745
+    },
+    "state_tmp_response_shm": {
+      "total_sec": {
+        "p50": 1.3597357049984566,
+        "p95": 1.3869348430016544,
+        "max": 1.4561999409997952
+      },
+      "worker_encode_sec": {
+        "p50": 0.8357094585007872,
+        "p95": 0.8590023149954504,
+        "max": 0.936353072997008
+      },
+      "non_worker_sec": {
+        "p50": 0.5193986584999948,
+        "p95": 0.5319439340019017,
+        "max": 0.5388197909996961
+      },
+      "succeeded_tail_sec": {
+        "p50": 0.21233002550070523,
+        "p95": 0.2165273819991853,
+        "max": 0.224369490002573
+      },
+      "response_write_to_parent_return_sec": {
+        "p50": 0.008005573999980697,
+        "p95": 0.011976702997344546,
+        "max": 0.012175965995993465
+      },
+      "count": 20,
+      "paths_valid": true,
+      "status_all_ok": true,
+      "p50_improvement_vs_tmp_tmp_percent": 6.301295250685168
+    },
+    "state_tmp_response_tmp": {
+      "total_sec": {
+        "p50": 1.4511787635019573,
+        "p95": 1.584165784996003,
+        "max": 1.6737159170006635
+      },
+      "worker_encode_sec": {
+        "p50": 0.8330287460012187,
+        "p95": 0.8709471639958792,
+        "max": 0.9933791529983864
+      },
+      "non_worker_sec": {
+        "p50": 0.6150337505096104,
+        "p95": 0.714812575999531,
+        "max": 0.7486809099937091
+      },
+      "succeeded_tail_sec": {
+        "p50": 0.09342719950291212,
+        "p95": 0.22437931600143202,
+        "max": 0.2563271859980887
+      },
+      "response_write_to_parent_return_sec": {
+        "p50": 0.1539383444978739,
+        "p95": 0.15934553699480603,
+        "max": 0.3689666150021367
+      },
+      "count": 20,
+      "paths_valid": true,
+      "status_all_ok": true,
+      "p50_improvement_vs_tmp_tmp_percent": 0.0
+    }
+  }
+}

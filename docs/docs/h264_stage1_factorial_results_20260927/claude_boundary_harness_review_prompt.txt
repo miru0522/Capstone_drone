@@ -1,0 +1,17 @@
+정정 승인된 mp4v/H264 실제 함수 경계 비교 설계를 구현했다. 실행 전에 다음 파일을 검수하라.
+
+- docs/docs/h264_test_artifacts_20260926/stage1_mp4v_vs_h264_boundary.py
+- docs/docs/h264_test_artifacts_20260926/run_stage1_mp4v_vs_h264_boundary.sh
+- docs/docs/h264_test_artifacts_20260926/stage1_storage_factorial.py
+- jetson/code/uploader.py
+
+확인 항목:
+1. mp4v는 `_encode_frames_mp4v()`를 인위적 상태 기록 없이 그대로 호출하는가?
+2. H264는 `_encode_frames_h264()` 전체 반환 경계를 호출하며 state/response만 `/dev/shm`으로 라우팅하는가?
+3. 동일 프레임 객체, 81장, 960x540, 9fps, 각 20회 고정 seed 무작위 교차인가?
+4. 각 출력 파일의 존재/크기와 cleanup, H264 상태·경로, 운영 PID·로그 중첩, 메모리 계측이 올바른가?
+5. import 전역, monkeypatch, cleanup, 스테이징 경로 때문에 실행 실패나 측정 왜곡이 생길 버그가 있는가?
+6. main.py 실행 중 이 40회 저장영상 시험을 실행 승인할 수 있는가?
+
+불필요한 확장은 피하고 실행 차단 오류만 MUST로 구분하라.
+출력: APPROVE/REVISE, MUST, 근거, 승인 범위. 파일은 수정하지 마라.

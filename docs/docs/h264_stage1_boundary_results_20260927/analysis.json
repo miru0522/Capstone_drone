@@ -1,0 +1,44 @@
+{
+  "encode_count": 40,
+  "main_pid_all_alive": true,
+  "main_trigger_total": 0,
+  "main_mp4v_encode_total": 0,
+  "main_upload_start_total": 0,
+  "memory": {
+    "mem_available_min_kib": 1629472,
+    "mem_available_max_kib": 1972756,
+    "swap_used_min_kib": 1101312,
+    "swap_used_max_kib": 1101312
+  },
+  "conditions": {
+    "mp4v": {
+      "count": 20,
+      "p50_sec": 1.98493512549976,
+      "p95_sec": 2.0532324469968444,
+      "p95_linear_sec": 2.056746362647027,
+      "max_sec": 2.1235107600004994,
+      "size_bytes_median": 3104481.0
+    },
+    "h264_shm_shm": {
+      "count": 20,
+      "p50_sec": 1.071584247500141,
+      "p95_sec": 1.462346111999068,
+      "p95_linear_sec": 1.4927665316492498,
+      "max_sec": 2.0707545050026965,
+      "size_bytes_median": 1398522.0
+    }
+  },
+  "improvement_percent": {
+    "p50": 46.014142541291314,
+    "p95": 28.778345864445843,
+    "p95_linear": 27.42097135749576,
+    "max": 2.4843884001694683,
+    "size": 54.951503971195194
+  },
+  "h264": {
+    "state_all_ok": true,
+    "paths_all_shm": true,
+    "worker_encode_p50_sec": 0.8299256865029747,
+    "worker_encode_p95_sec": 0.98096334800357
+  }
+}

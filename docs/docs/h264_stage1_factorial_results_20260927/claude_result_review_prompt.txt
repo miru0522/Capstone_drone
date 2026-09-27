@@ -1,0 +1,34 @@
+H264 지속 worker 조건 연구의 2x2 결과를 단계 검수하라. 다음 파일을 직접 읽어라.
+
+- docs/docs/h264_stage1_factorial_results_20260927/README.md
+- docs/docs/h264_stage1_factorial_results_20260927/results.jsonl
+- docs/docs/h264_stage1_factorial_results_20260927/analysis.json
+- docs/docs/h264_stage1_factorial_results_20260927/environment.txt
+- docs/docs/h264_stage1_factorial_results_20260927/tegrastats.log
+- docs/docs/h264_test_artifacts_20260926/stage1_storage_factorial.py
+- docs/docs/h264_test_artifacts_20260926/analyze_stage1_factorial.py
+- jetson/code/uploader.py
+- jetson/code/h264_encoder_worker.py
+- docs/docs/h264_stage1_results_20260927/README.md
+- docs/docs/H264지속Worker_20퍼센트감축_조건연구_20260927.md
+
+검수 질문:
+1. 80회 원시 결과에서 README와 analysis.json의 p50/p95/max, 개선율, 경로·상태·운영 중첩·메모리 결론이 맞는가?
+2. 둘 다 /dev/shm 조건의 p95 역전을 cold와 worker encode 이상치의 불균형 배정으로 보는 것이 타당한가? 무엇까지 인과적으로 말할 수 있는가?
+3. 상태와 response를 모두 /dev/shm으로 옮기는 후보가 굳이 필요한가? 상태만 또는 response만 옮기는 더 단순한 안보다 두 파일 전환을 채택할 근거가 충분한가?
+4. `/dev/shm`으로 옮길 경우 안전·장애 관측성·재부팅·공간부족·권한·원자성·cleanup에서 빠진 위험은 무엇인가?
+5. 현재 20% 목표에 관해 말할 수 있는 것과 없는 것을 구분하라.
+6. 다음 단계로 같은 저장 영상 mp4v 20회 대조군을 먼저 추가하는 것이 맞는가, 아니면 다른 검증이 우선인가? main.py 실행 중 허용할 정확한 범위를 제시하라.
+
+오류, 빠진 것, 굳이 할 필요 없는 것을 엄격히 찾되 불필요한 확장은 피하라.
+
+출력 형식:
+- 판정: APPROVE 또는 REVISE
+- 수치 재검산
+- 해석 판정
+- MUST
+- SHOULD
+- 채택/기각 조건
+- 승인된 다음 단계
+
+파일은 수정하지 말고 한국어 검수 결과만 출력하라.

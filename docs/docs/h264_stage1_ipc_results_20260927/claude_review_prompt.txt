@@ -1,0 +1,31 @@
+당신은 Jetson 영상 파이프라인의 독립 검수자다. 다음 파일을 직접 읽고 1단계 IPC 진단과 다음 실험 설계를 엄격하게 검수하라.
+
+- docs/docs/H264하드웨어인코더_테스트아키텍처_20260926.md
+- docs/docs/H264지속Worker_20퍼센트감축_조건연구_20260927.md
+- docs/docs/h264_stage1_results_20260927/README.md
+- docs/docs/h264_stage1_results_20260927/results.jsonl
+- docs/docs/h264_stage1_ipc_results_20260927/README.md
+- docs/docs/h264_stage1_ipc_results_20260927/results.jsonl
+- docs/docs/h264_test_artifacts_20260926/stage1_condition_benchmark.py
+- docs/docs/h264_test_artifacts_20260926/stage1_ipc_diagnostic.py
+- docs/docs/h264_test_artifacts_20260926/research_h264_worker.py
+- jetson/code/uploader.py
+- jetson/code/h264_encoder_worker.py
+
+중점 질문:
+1. 기존 벤치마크가 운영 경로의 마지막 succeeded 상태 기록을 누락했다는 판단이 맞는가? 그 결과 기존 29.38% 주장을 폐기하는 것이 맞는가?
+2. 약 0.30초 잔차를 /tmp atomic JSON write/fsync 두 번이 지배한다는 결론이 데이터와 코드에서 성립하는가? 계측 구간에 잘못 귀속된 시간은 없는가?
+3. 다음 시험을 상태파일 위치(/tmp, /dev/shm) x response 위치(/tmp, /dev/shm)의 2x2 요인으로 하고, 각 조건 20회 무작위 교차하며 started와 succeeded 기록을 모두 포함한 생산 함수 경계를 측정하는 설계가 타당한가?
+4. /dev/shm 전환이 안전성과 장애 관측성에 미치는 영향은 무엇인가? response는 일회성 IPC이고 상태파일은 현재도 /tmp의 휘발성 파일이라는 전제에서, 운영 후보로 허용할 조건을 제시하라.
+5. 굳이 할 필요 없는 항목, 오류, 빠진 통제변수, 다음 단계 전에 반드시 고칠 항목을 찾아라.
+6. main.py 실행 중에도 저장 영상과 /tmp 복사본만 사용하는 이 20회 2x2 선별 시험을 허용할지 판단하라. 100회/30분, maxperf, 실제 업로드는 여전히 제외한다.
+
+출력 형식:
+- 판정: APPROVE 또는 REVISE
+- 계산/코드 검증
+- MUST(없으면 없음)
+- SHOULD(없으면 없음)
+- 승인된 다음 시험의 정확한 조건
+- 20% 목표에 대해 현재 말할 수 있는 것과 말할 수 없는 것
+
+직접 파일을 수정하지 말고 검수 결과만 한국어로 출력하라.

@@ -1,0 +1,28 @@
+직전 결과 검수의 다음 MUST를 재검토하라.
+
+당신은 "mp4v n=20 대조군도 동일 /dev/shm,/dev/shm 저장소 조건과 완전한 started+succeeded 상태 기록 경계"를 요구했다. 그러나 코드를 보면:
+
+- `uploader._encode_frames_mp4v()`는 H264 상태파일과 worker response를 전혀 사용하지 않는다.
+- 현재 운영 mp4v도 started/succeeded 상태 기록을 하지 않는다.
+- H264 후보만 안전 관측을 위해 `_record_h264_state()`와 worker response를 사용한다.
+- H264 최종 MP4와 mp4v 최종 MP4는 둘 다 `tempfile.mkstemp()` 기본 `/tmp`에 생성된다. 이번 `/dev/shm` 요인은 최종 영상 저장소가 아니라 H264 전용 수 KB 상태/IPC 파일만 바꾼 것이다.
+
+따라서 mp4v에 인위적으로 H264 상태 기록과 response 파일을 추가하면 실제 교체 전 mp4v보다 느려져 H264에 유리한 대조군이 된다. 올바른 교체 판단은 같은 저장 영상·같은 fps/해상도에서 실제 운영 함수 경계인 `_encode_frames_mp4v()` 반환 시간과, 안전 오버헤드를 모두 포함한 선택 후보 `_encode_frames_h264()` 반환 시간을 고정 seed 무작위 교차로 각 20회 측정하는 것이라고 판단한다. H264 쪽 state/response만 `/dev/shm` 조건을 사용한다.
+
+다음 파일을 다시 읽고 이 이견을 엄격히 판정하라.
+
+- jetson/code/uploader.py
+- docs/docs/h264_test_artifacts_20260926/stage1_storage_factorial.py
+- docs/docs/h264_stage1_factorial_results_20260927/README.md
+- docs/docs/H264지속Worker_20퍼센트감축_조건연구_20260927.md
+
+질문:
+1. mp4v에 존재하지 않는 H264 전용 상태/response를 추가하는 것이 공정한가?
+2. 실제 교체 전후 함수 경계를 그대로 비교하는 위 설계가 맞는가?
+3. 맞다면 직전 MUST를 명시적으로 철회·정정하고, main.py 실행 중 승인되는 다음 시험 조건을 정확히 써라.
+4. 틀리다면 어떤 공통 경계를 어떻게 구현해야 실제 운영 교체 효과를 왜곡하지 않는지 코드 수준으로 설명하라.
+
+추가로 문서에 반영한 state-only 16.69% 기각 근거, 단일 warm-up 슬롯 표현,
+tmpfs 재부팅/ENOSPC/관측성 위험이 직전 MUST를 충족하는지도 확인하라.
+
+출력: 판정, 정정 여부, 남은 MUST, 승인된 정확한 대조군 설계. 파일은 수정하지 마라.

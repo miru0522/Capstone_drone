@@ -1,0 +1,2 @@
+SOC family:tegra194  Machine:NVIDIA Jetson Xavier NX Developer Kit
+Error: Run this script(/usr/bin/jetson_clocks) as a root user

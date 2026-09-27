@@ -1,0 +1,19 @@
+NV Power Mode: MODE_20W_6CORE
+8
+NVPM ERROR: Error opening /sys/kernel/nvpmodel_emc_cap/emc_iso_cap: 13
+NVPM ERROR: failed to read PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_emc_cap/emc_iso_cap
+NVPM ERROR: Error opening /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_max: 13
+NVPM ERROR: failed to read PARAM VDDIN_OC_LIMIT: ARG WARN: PATH /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_max
+NVPM ERROR: Error opening /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_crit: 13
+NVPM ERROR: failed to read PARAM VDDIN_OC_LIMIT: ARG CRIT: PATH /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_crit
+governor=schedutil
+main_pid=5563
+main_cmd=python3 main.py
+main_fd1=/home/hpc/drone_2026/code/logs/main.log
+main_fd2=/home/hpc/drone_2026/code/logs/main.log
+main_log_verified=/home/hpc/drone_2026/code/logs/main.log
+main_clip_encoder=mp4v(default)
+video=/home/hpc/drone_2026/video/04_Violence_conf_0.9987_assault_7-4_cam01_positive9s_46e89e4e.mp4
+Filesystem       1B-blocks        Used  Available Use% Mounted on
+tmpfs           3582443520       57344 3582386176   1% /dev/shm
+/dev/mmcblk0p1 61997211648 49677860864 9627877376  84% /
