@@ -45,6 +45,10 @@ def _assert_no_raw_files(directory: Path) -> None:
 
 
 def main() -> None:
+    if "H264_STATE_PATH" not in os.environ:
+        assert uploader.H264_STATE_PATH == os.path.join(
+            uploader.H264_RAW_DIR, "drone_clip_encoder_state.json"
+        )
     original = {
         "CLIP_ENCODER": uploader.CLIP_ENCODER,
         "H264_WORKER_PATH": uploader.H264_WORKER_PATH,
@@ -115,9 +119,10 @@ def main() -> None:
             uploader.CLIP_ENCODER = "h264"
             uploader.H264_WORKER_MODE = "persistent"
             uploader.H264_TIMEOUT_SEC = 2
+            response_marker = directory / "observed_response_path.txt"
             _write_worker(
                 worker,
-                """
+                f"""
                 import json, os, pathlib, sys
                 if sys.argv[1:] != ['--serve']:
                     raise SystemExit(9)
@@ -127,13 +132,22 @@ def main() -> None:
                         b'0000ftyp0000moov0000avc1'
                     )
                     response = pathlib.Path(request['response_path'])
+                    pathlib.Path({str(response_marker)!r}).write_text(
+                        str(response), encoding='utf-8'
+                    )
                     temporary = pathlib.Path(str(response) + '.tmp')
-                    temporary.write_text(json.dumps({'ok': True}), encoding='utf-8')
+                    temporary.write_text(json.dumps({{'ok': True}}), encoding='utf-8')
                     os.replace(temporary, response)
                 """,
             )
             first = uploader.encode_frames_to_mp4(_frames(), fps=9)
             first_pid = uploader._persistent_worker.pid
+            observed_response = Path(
+                response_marker.read_text(encoding="utf-8")
+            )
+            assert observed_response.parent == directory
+            assert observed_response.name.endswith(".bgr.response.json")
+            assert not observed_response.exists()
             second = uploader.encode_frames_to_mp4(_frames(), fps=9)
             second_pid = uploader._persistent_worker.pid
             os.remove(first)
