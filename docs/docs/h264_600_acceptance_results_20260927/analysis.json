@@ -1,0 +1,253 @@
+{
+  "encode_count": 200,
+  "condition_counts": {
+    "mp4v": 100,
+    "h264_600k": 100
+  },
+  "paired": {
+    "count": 100,
+    "median_improvement_percent": 24.467268561871727,
+    "p05_improvement_percent": 5.379290332757902,
+    "min_improvement_percent": -15.249007219676525,
+    "pairs_at_least_20_percent": 76,
+    "pairs_slower_than_mp4v": 4
+  },
+  "h264_drift": {
+    "first25_p95_sec": 1.1854155530018033,
+    "last25_p95_sec": 1.2008488840074278,
+    "p95_change_percent": 1.301934242936409
+  },
+  "resources": {
+    "uploader_rss_min_kib": 294132,
+    "uploader_rss_max_kib": 311640,
+    "uploader_fd_min": 27,
+    "uploader_fd_max": 27,
+    "uploader_threads_min": 7,
+    "uploader_threads_max": 9,
+    "worker_rss_min_kib": 64496,
+    "worker_rss_max_kib": 72868,
+    "worker_fd_min": 26,
+    "worker_fd_max": 41,
+    "worker_threads_min": 3,
+    "worker_threads_max": 5
+  },
+  "temperature": {
+    "AUX": {
+      "mean_c": 45.01723289020187,
+      "max_c": 46.5
+    },
+    "CPU": {
+      "mean_c": 46.27720334810438,
+      "max_c": 48.0
+    },
+    "thermal": {
+      "mean_c": 45.43776464795667,
+      "max_c": 46.9
+    },
+    "AO": {
+      "mean_c": 44.997784342688334,
+      "max_c": 46.0
+    },
+    "GPU": {
+      "mean_c": 45.143771541112756,
+      "max_c": 48.0
+    },
+    "PMIC": {
+      "mean_c": 50.0,
+      "max_c": 50.0
+    }
+  },
+  "videos_below_20_percent": [
+    "02_Violence_conf_0.9989_fight_40-2_cam02_positive9s_faba4a96.mp4",
+    "top5_both_models/03_Violence_Fighting_Fighting033_x264.mp4",
+    "top5_both_models/04_Violence_Fighting_Fighting018_x264.mp4",
+    "top5_both_models/05_Accident_RoadAccidents_RoadAccidents124_x264.mp4",
+    "ucf/RoadAccidents128_x264.mp4"
+  ],
+  "videos_slower_than_mp4v": [
+    "top5_both_models/04_Violence_Fighting_Fighting018_x264.mp4",
+    "ucf/RoadAccidents128_x264.mp4"
+  ],
+  "per_video": {
+    "01_Violence_conf_0.9995_robbery_182-1_cam02_positive9s_3249ea3e.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 41.03977014738409,
+      "min_improvement_percent": 37.00740173344056,
+      "max_improvement_percent": 45.07213856132761
+    },
+    "02_Violence_conf_0.9989_fight_40-2_cam02_positive9s_faba4a96.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 18.791718789285326,
+      "min_improvement_percent": 15.388570215787023,
+      "max_improvement_percent": 22.194867362783633
+    },
+    "03_Violence_conf_0.9988_fight_437-2_cam01_positive9s_644b9502.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 30.66537171595488,
+      "min_improvement_percent": 27.233778148715594,
+      "max_improvement_percent": 34.096965283194166
+    },
+    "04_Violence_conf_0.9987_assault_7-4_cam01_positive9s_46e89e4e.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 43.16594990037938,
+      "min_improvement_percent": 39.470754693708955,
+      "max_improvement_percent": 46.86114510704981
+    },
+    "05_Violence_conf_0.9986_assault_18-5_cam01_positive9s_28ab9723.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 23.06656261454375,
+      "min_improvement_percent": 22.296484770279402,
+      "max_improvement_percent": 23.83664045880809
+    },
+    "input_encoded_event2.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 39.80981227326171,
+      "min_improvement_percent": 36.05830273528061,
+      "max_improvement_percent": 43.561321811242806
+    },
+    "kakao_20260914.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 25.21491835852502,
+      "min_improvement_percent": 19.74734825206843,
+      "max_improvement_percent": 30.682488464981606
+    },
+    "kakao_20260917_202657994.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 21.926976044691642,
+      "min_improvement_percent": 19.696319714742128,
+      "max_improvement_percent": 24.157632374641157
+    },
+    "kakao_20260917_202709424.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 20.852132452141383,
+      "min_improvement_percent": 11.720548916103969,
+      "max_improvement_percent": 29.983715988178794
+    },
+    "kakao_20260917_3.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 22.59189316549816,
+      "min_improvement_percent": 20.738146265974265,
+      "max_improvement_percent": 24.445640065022054
+    },
+    "kakao_20260917_4.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 25.662253351091863,
+      "min_improvement_percent": 23.964196047511177,
+      "max_improvement_percent": 27.36031065467255
+    },
+    "kakao_20260917_5.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 20.9427637899077,
+      "min_improvement_percent": 20.61086917192202,
+      "max_improvement_percent": 21.274658407893387
+    },
+    "testvideo_seo_last160_event277.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 38.60239020913826,
+      "min_improvement_percent": 38.32385825095629,
+      "max_improvement_percent": 38.88092216732022
+    },
+    "top5_both_models/01_Violence_Assault_Assault006_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 31.54436559070369,
+      "min_improvement_percent": 31.40316115004077,
+      "max_improvement_percent": 31.685570031366616
+    },
+    "top5_both_models/02_Violence_Fighting_Fighting003_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 26.25953177195842,
+      "min_improvement_percent": 26.014006877207862,
+      "max_improvement_percent": 26.50505666670898
+    },
+    "top5_both_models/03_Violence_Fighting_Fighting033_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 9.042128274530114,
+      "min_improvement_percent": 5.379290332757902,
+      "max_improvement_percent": 12.704966216302328
+    },
+    "top5_both_models/04_Violence_Fighting_Fighting018_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": -7.415858600953529,
+      "min_improvement_percent": -8.172577769105228,
+      "max_improvement_percent": -6.6591394328018305
+    },
+    "top5_both_models/05_Accident_RoadAccidents_RoadAccidents124_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 17.66482956323232,
+      "min_improvement_percent": 17.400059050842632,
+      "max_improvement_percent": 17.92960007562201
+    },
+    "ucf/Abuse028_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 22.552486335400225,
+      "min_improvement_percent": 19.317554687730564,
+      "max_improvement_percent": 25.787417983069883
+    },
+    "ucf/Assault006_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 25.829127186726897,
+      "min_improvement_percent": 22.78626556443629,
+      "max_improvement_percent": 28.871988809017502
+    },
+    "ucf/Burglary017_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 27.14073819092918,
+      "min_improvement_percent": 24.488897058721403,
+      "max_improvement_percent": 29.79257932313696
+    },
+    "ucf/Fighting003_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 30.47385562000295,
+      "min_improvement_percent": 26.667885122552416,
+      "max_improvement_percent": 34.27982611745348
+    },
+    "ucf/RoadAccidents002_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 34.653382662277885,
+      "min_improvement_percent": 28.364558637676186,
+      "max_improvement_percent": 40.94220668687958
+    },
+    "ucf/RoadAccidents010_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 38.90648533030182,
+      "min_improvement_percent": 38.5305622038992,
+      "max_improvement_percent": 39.282408456704445
+    },
+    "ucf/RoadAccidents128_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": -9.500403420436465,
+      "min_improvement_percent": -15.249007219676525,
+      "max_improvement_percent": -3.7517996211964055
+    },
+    "ucf/Robbery048_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 24.670344017199113,
+      "min_improvement_percent": 23.945499212344924,
+      "max_improvement_percent": 25.395188822053306
+    },
+    "ucf/Shoplifting034_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 34.86405515361348,
+      "min_improvement_percent": 32.066992978146494,
+      "max_improvement_percent": 37.661117329080454
+    },
+    "ucf/Stealing062_x264.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 31.738353106198453,
+      "min_improvement_percent": 27.84745828260753,
+      "max_improvement_percent": 35.62924792978938
+    },
+    "violence_20260825_event182_score0.58.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 48.90060525517771,
+      "min_improvement_percent": 47.960627363689724,
+      "max_improvement_percent": 49.84058314666569
+    },
+    "violence_20260825_event184.mp4": {
+      "pair_count": 2,
+      "median_improvement_percent": 32.97318864092871,
+      "min_improvement_percent": 19.96457037113307,
+      "max_improvement_percent": 45.98180691072435
+    }
+  }
+}

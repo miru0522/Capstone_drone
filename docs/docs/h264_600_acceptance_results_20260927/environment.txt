@@ -1,0 +1,23 @@
+started_at=2026-09-27T19:34:22+09:00
+main_pid=5563
+main_log=/home/hpc/drone_2026/code/logs/main.log
+main_clip_encoder=mp4v
+video_root=/home/hpc/drone_2026/video
+reference_a=/home/hpc/drone_2026/video/kakao_20260914.mp4
+reference_b=/home/hpc/drone_2026/video/top5_both_models/01_Violence_Assault_Assault006_x264.mp4
+bitrate=600000
+all_video_repeats=2
+reference_repeats=20
+idle_sec=8.0
+Filesystem       1B-blocks        Used  Available Use% Mounted on
+tmpfs           3582443520       57344 3582386176   1% /dev/shm
+/dev/mmcblk0p1 61997211648 49706246144 9599492096  84% /
+NV Power Mode: MODE_20W_6CORE
+8
+NVPM ERROR: Error opening /sys/kernel/nvpmodel_emc_cap/emc_iso_cap: 13
+NVPM ERROR: failed to read PARAM EMC: ARG MAX_FREQ: PATH /sys/kernel/nvpmodel_emc_cap/emc_iso_cap
+NVPM ERROR: Error opening /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_max: 13
+NVPM ERROR: failed to read PARAM VDDIN_OC_LIMIT: ARG WARN: PATH /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_max
+NVPM ERROR: Error opening /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_crit: 13
+NVPM ERROR: failed to read PARAM VDDIN_OC_LIMIT: ARG CRIT: PATH /sys/devices/platform/c250000.i2c/i2c-7/7-0040/hwmon/hwmon5/curr1_crit
+finished_at=2026-09-27T20:08:33+09:00
