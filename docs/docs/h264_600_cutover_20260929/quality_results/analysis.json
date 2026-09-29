@@ -1,0 +1,48 @@
+{
+  "conditions": {
+    "mp4v": {
+      "video_count": 30,
+      "psnr_mean_db": 37.02257574921075,
+      "psnr_worst_video_mean_db": 33.92856536929388,
+      "psnr_video_mean_pass_count": 30,
+      "ssim_mean": 0.9682008401356607,
+      "ssim_worst_video_mean": 0.9305969550285811,
+      "ssim_video_mean_pass_count": 27,
+      "mean_size_bytes": 1255478.0666666667,
+      "ssim_below_0_95": [
+        "03_Violence_conf_0.9988_fight_437-2_cam01_positive9s_644b9502.mp4",
+        "04_Violence_conf_0.9987_assault_7-4_cam01_positive9s_46e89e4e.mp4",
+        "input_encoded_event2.mp4"
+      ]
+    },
+    "h264_600k": {
+      "video_count": 30,
+      "psnr_mean_db": 36.356303808622116,
+      "psnr_worst_video_mean_db": 32.00113412865646,
+      "psnr_video_mean_pass_count": 30,
+      "ssim_mean": 0.9557496948006713,
+      "ssim_worst_video_mean": 0.8562635514471266,
+      "ssim_video_mean_pass_count": 23,
+      "mean_size_bytes": 682160.9333333333,
+      "ssim_below_0_95": [
+        "01_Violence_conf_0.9995_robbery_182-1_cam02_positive9s_3249ea3e.mp4",
+        "03_Violence_conf_0.9988_fight_437-2_cam01_positive9s_644b9502.mp4",
+        "04_Violence_conf_0.9987_assault_7-4_cam01_positive9s_46e89e4e.mp4",
+        "input_encoded_event2.mp4",
+        "ucf/RoadAccidents010_x264.mp4",
+        "ucf/Shoplifting034_x264.mp4",
+        "ucf/Stealing062_x264.mp4"
+      ]
+    }
+  },
+  "h264_vs_mp4v": {
+    "mean_psnr_delta_db": -0.6662719405886425,
+    "mean_ssim_delta": -0.012451145334989437,
+    "mean_size_reduction_percent": 45.66524486210326
+  },
+  "aggregate_gate": {
+    "psnr_threshold_db": 30.0,
+    "ssim_threshold": 0.95,
+    "h264_pass": true
+  }
+}
