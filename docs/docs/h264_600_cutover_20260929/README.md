@@ -72,24 +72,25 @@
 1. 운영 로그, Git 상태, PID와 환경을 다시 기록한다.
 2. 번들을 Jetson 격리 디렉터리에 올리고 `cutover_preflight.sh`를 실행한다.
 3. manifest 해시와 Jetson 격리 사본의 `sha256sum`을 대조한다.
-4. 운영 후보 5개 파일을 각각 시간 표시 이름으로 백업한다. 운영에 없는 worker는 없음 상태를 기록한다.
-5. 후보 5개 파일을 운영 checkout에 복사하고 `py_compile`, `bash -n`, `git diff --check`를 수행한다.
-6. **먼저** `CLIP_ENCODER=mp4v ./restart_component.sh main`을 실행한다. 새 PID, 설정 로그, 기존 mp4v 동작을 확인해 실제 롤백 경로를 실증한다.
-7. 6단계가 통과한 경우에만 변경분을 `vadclip-v4-20260831`에 커밋·push한다.
-8. `./restart_component.sh main`으로 main만 다시 시작해 H264 600 kbps를 활성화한다.
-9. 새 PID 환경에서 `CLIP_ENCODER=h264`, `H264_BITRATE=600000`, `UPLOAD_MODE=B`를 확인한다.
-10. 별도 승인된 첫 실제 트리거에서 H264 인코딩, 업로드와 서버 결과를 확인한다.
+4. preflight가 출력한 운영 4개 파일의 SHA-256이 manifest `baseline`과 일치하고 운영 worker가 없음을 확인한다. 불일치하면 **복사하지 않고 중단**해 팀원 변경 여부를 확인한다.
+5. 운영 후보 5개 파일을 각각 시간 표시 이름으로 백업한다. 운영에 없는 worker는 없음 상태를 기록한다.
+6. 후보 5개 파일을 운영 checkout에 복사하고 `py_compile`, `bash -n`, `git diff --check`를 수행한다.
+7. **먼저** `CLIP_ENCODER=mp4v ./restart_component.sh main`을 실행한다. 새 PID, 설정 로그, 기존 mp4v 동작을 확인해 실제 롤백 경로를 실증한다.
+8. 7단계가 통과한 경우에만 변경분을 `vadclip-v4-20260831`에 커밋·push한다.
+9. `./restart_component.sh main`으로 main만 다시 시작해 H264 600 kbps를 활성화한다.
+10. 새 PID 환경에서 `CLIP_ENCODER=h264`, `H264_BITRATE=600000`, `UPLOAD_MODE=B`를 확인한다.
+11. 별도 승인된 첫 실제 트리거에서 H264 인코딩, 업로드와 서버 결과를 확인한다.
 
-`start_all.sh` 전체 재기동, `pkill python3`, `dae_*` 조작은 하지 않는다. 6단계의 실제 재시작과 이후 활성화는 운영 변경이므로 별도 승인 전에는 실행하지 않는다.
+`start_all.sh` 전체 재기동, `pkill python3`, `dae_*` 조작은 하지 않는다. 7단계의 실제 재시작과 이후 활성화는 운영 변경이므로 별도 승인 전에는 실행하지 않는다.
 
 ## 중단 및 롤백 조건
 
-- preflight 실패, 해시 불일치, 잔존 worker 또는 `/dev/shm` 상태 파일 발견
+- preflight 실패, 후보 해시 불일치, 운영 파일이 manifest `baseline`과 불일치, 잔존 worker 또는 `/dev/shm` 상태 파일 발견
 - `logs/main.pid`와 실제 PID 불일치
 - mp4v 확인 재시작에서 기존 동작과 차이 발생
 - H264 새 PID 환경변수 불일치
 - H264 인코딩 실패, 3초 초과, 업로드 실패
-- 상태 파일의 `rollback_recommended=true`
+- 상태 파일의 `status="error"`는 즉시 조사하고, `status="rollback_recommended"`이면 롤백
 
 중단 시 백업 파일을 복원하고 `CLIP_ENCODER=mp4v ./restart_component.sh main`으로 main만 재시작한다. `rollback_recommended`는 자동 조치 신호가 아니며 운영자가 로그를 확인한 뒤 이 절차를 실행한다.
 

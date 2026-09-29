@@ -1,3 +1,8 @@
+baseline_match=main.py sha256=e6ab8de866cd7a488362f8fb71708dfb70773603481ab16003a33eaf6f9cb5e8
+baseline_match=uploader.py sha256=ac214f96331a63630bba76179969059d82667db2e915fd5614d834c3a1561011
+baseline_match=start_all.sh sha256=b1915fde5812780303ae486bf3b752f47a225ee0799fd4819a5f2ad79ae85936
+baseline_match=restart_component.sh sha256=e124b1b924aa90f94a29dc94c6d423fa70d1cfb1a1086456c728f0baac7d514b
+baseline_match=h264_encoder_worker.py expected=absent actual=absent
 preflight=PASS
 main_pid=5563
 current_encoder=mp4v
@@ -8,10 +13,10 @@ Filesystem      1B-blocks  Used  Available Use% Mounted on
 tmpfs          3582443520 57344 3582386176   1% /dev/shm
 memory_snapshot:
               total        used        free      shared  buff/cache   available
-Mem:           6832        4442         869          51        1520        2138
+Mem:           6832        4452         859          51        1521        2129
 Swap:          3416        1076        2339
-ba020a8d8a534539439e72c44b60d2fa6d8bb5ba8576f7ab6cc3460f32d89135  /tmp/codex_h264_cutover_review2/candidate/main.py
-5ea7aaaee1d72370011fd19f4b5193942b9710aa9a6fc4a29cd6da258d8f4336  /tmp/codex_h264_cutover_review2/candidate/uploader.py
-91700efafa09c755bb30ad7438b9c6c7ab49c31fc3f08e51c4dda88a4e7a30e2  /tmp/codex_h264_cutover_review2/candidate/h264_encoder_worker.py
-62bcb38cea38f6ed9d2eb1738c74a556a766918e8513f79e09ed62b88465eda6  /tmp/codex_h264_cutover_review2/candidate/start_all.sh
-9c268d3823296f82300d5df11889caa5b2a12e7951b96a73a62d414d5c8d0536  /tmp/codex_h264_cutover_review2/candidate/restart_component.sh
+ba020a8d8a534539439e72c44b60d2fa6d8bb5ba8576f7ab6cc3460f32d89135  /tmp/codex_h264_cutover_review3/candidate/main.py
+5ea7aaaee1d72370011fd19f4b5193942b9710aa9a6fc4a29cd6da258d8f4336  /tmp/codex_h264_cutover_review3/candidate/uploader.py
+91700efafa09c755bb30ad7438b9c6c7ab49c31fc3f08e51c4dda88a4e7a30e2  /tmp/codex_h264_cutover_review3/candidate/h264_encoder_worker.py
+62bcb38cea38f6ed9d2eb1738c74a556a766918e8513f79e09ed62b88465eda6  /tmp/codex_h264_cutover_review3/candidate/start_all.sh
+9c268d3823296f82300d5df11889caa5b2a12e7951b96a73a62d414d5c8d0536  /tmp/codex_h264_cutover_review3/candidate/restart_component.sh

@@ -4,6 +4,12 @@ set -euo pipefail
 BUNDLE_DIR=$(cd "$(dirname "$0")" && pwd)
 CANDIDATE="$BUNDLE_DIR/candidate"
 CODE_DIR=${CODE_DIR:-/home/hpc/drone_2026/code}
+MANIFEST="$BUNDLE_DIR/manifest.json"
+
+if [[ ! -f "$MANIFEST" ]]; then
+  echo "manifest 없음: $MANIFEST" >&2
+  exit 1
+fi
 
 for file in main.py uploader.py h264_encoder_worker.py start_all.sh restart_component.sh; do
   if [[ ! -f "$CANDIDATE/$file" ]]; then
@@ -17,6 +23,32 @@ for file in ring_buffer.py state_store.py; do
     exit 1
   fi
 done
+
+python3 - "$MANIFEST" "$CODE_DIR" <<'PY'
+import hashlib
+import json
+import sys
+from pathlib import Path
+
+manifest_path = Path(sys.argv[1])
+code_dir = Path(sys.argv[2])
+baseline = json.loads(manifest_path.read_text(encoding="utf-8"))["baseline"]
+for name in ("main.py", "uploader.py", "start_all.sh", "restart_component.sh"):
+    path = code_dir / name
+    if not path.is_file():
+        raise SystemExit(f"운영 기준 파일 없음: {path}")
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    expected = baseline[name]
+    if actual != expected:
+        raise SystemExit(
+            f"운영 파일 baseline 불일치: {name} expected={expected} actual={actual}"
+        )
+    print(f"baseline_match={name} sha256={actual}")
+worker = code_dir / "h264_encoder_worker.py"
+if worker.exists():
+    raise SystemExit(f"운영에 없어야 할 worker 발견: {worker}")
+print("baseline_match=h264_encoder_worker.py expected=absent actual=absent")
+PY
 
 python3 -m py_compile "$CANDIDATE/main.py" "$CANDIDATE/uploader.py" \
   "$CANDIDATE/h264_encoder_worker.py"
