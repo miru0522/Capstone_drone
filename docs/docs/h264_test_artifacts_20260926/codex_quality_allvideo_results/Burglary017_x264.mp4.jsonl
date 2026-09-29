@@ -1,0 +1,56 @@
+{"condition": "mp4v", "repeat": 1, "size_bytes": 1537082, "status_code": 200, "elapsed_sec": 5.128276310002548, "body": {"status": "success", "message": "Pipeline completed", "event_data": {"droneId": "DR-01", "maeConfidence": 0.3773, "type": "CRITICAL", "label": "폭력", "categoryId": 1, "description": "사무실에서 한 남성이 다른 사람을 밀어내며 흘러가는 동작을 하고 있습니다. 주변은 사무실 내부이며, 전체적으로 폭력적인 행동으로 보입니다.", "ttsText": "폭력이 발생했습니다. 즉시 행동을 중단하십시오."}, "backend_response": "이벤트 접수 및 브로드캐스트 성공. (ID: 510)"}}
+{"condition": "h264_900k", "repeat": 1, "size_bytes": 1024860, "status_code": 200, "elapsed_sec": 5.302438320999499, "body": {"status": "success", "message": "Pipeline completed", "event_data": {"droneId": "DR-01", "maeConfidence": 0.3721, "type": "CRITICAL", "label": "폭력", "categoryId": 1, "description": "사무실에서 한 사람이 다른 사람을 밀어내며 흘러가는 모습을 보고 있습니다. 주변은 사무실 내부로, 책상과 의자들이 배치된 공간이며, 전체적으로 폭력적인 행동으로 보입니다.", "ttsText": "폭력이 발생하고 있습니다. 즉시 행동을 중단하십시오."}, "backend_response": "이벤트 접수 및 브로드캐스트 성공. (ID: 511)"}}
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/connectionpool.py", line 536, in _make_request
+    response = conn.getresponse()
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/connection.py", line 507, in getresponse
+    httplib_response = super().getresponse()
+  File "/usr/lib/python3.8/http/client.py", line 1348, in getresponse
+    response.begin()
+  File "/usr/lib/python3.8/http/client.py", line 316, in begin
+    version, status, reason = self._read_status()
+  File "/usr/lib/python3.8/http/client.py", line 277, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/usr/lib/python3.8/socket.py", line 669, in readinto
+    return self._sock.recv_into(b)
+socket.timeout: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.8/dist-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/connectionpool.py", line 843, in urlopen
+    retries = retries.increment(
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/util/retry.py", line 474, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/connectionpool.py", line 789, in urlopen
+    response = self._make_request(
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/connectionpool.py", line 538, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+  File "/usr/local/lib/python3.8/dist-packages/urllib3/connectionpool.py", line 369, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPConnectionPool(host='203.249.90.3', port=8031): Read timed out. (read timeout=180)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "quality_server_judgment_test.py", line 106, in <module>
+    main()
+  File "quality_server_judgment_test.py", line 77, in main
+    outcome = send(output_path)
+  File "quality_server_judgment_test.py", line 27, in send
+    resp = requests.post(ANALYZE_URL, files=files, timeout=180)
+  File "/usr/local/lib/python3.8/dist-packages/requests/api.py", line 115, in post
+    return request("post", url, data=data, json=json, **kwargs)
+  File "/usr/local/lib/python3.8/dist-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/usr/local/lib/python3.8/dist-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/usr/local/lib/python3.8/dist-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/usr/local/lib/python3.8/dist-packages/requests/adapters.py", line 713, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPConnectionPool(host='203.249.90.3', port=8031): Read timed out. (read timeout=180)

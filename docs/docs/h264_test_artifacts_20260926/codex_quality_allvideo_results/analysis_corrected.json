@@ -1,0 +1,66 @@
+{
+  "video_file_count": 30,
+  "mp4v_h264_600k_complete_count": 28,
+  "complete_videos": [
+    "01_Violence_Assault_Assault006_x264.mp4",
+    "01_Violence_conf_0.9995_robbery_182-1_cam02_positive9s_3249ea3e.mp4",
+    "02_Violence_conf_0.9989_fight_40-2_cam02_positive9s_faba4a96.mp4",
+    "02_Violence_Fighting_Fighting003_x264.mp4",
+    "03_Violence_conf_0.9988_fight_437-2_cam01_positive9s_644b9502.mp4",
+    "03_Violence_Fighting_Fighting033_x264.mp4",
+    "04_Violence_conf_0.9987_assault_7-4_cam01_positive9s_46e89e4e.mp4",
+    "04_Violence_Fighting_Fighting018_x264.mp4",
+    "05_Accident_RoadAccidents_RoadAccidents124_x264.mp4",
+    "05_Violence_conf_0.9986_assault_18-5_cam01_positive9s_28ab9723.mp4",
+    "Abuse028_x264.mp4",
+    "Fighting003_x264.mp4",
+    "input_encoded_event2.mp4",
+    "kakao_20260914.mp4",
+    "kakao_20260917_202657994.mp4",
+    "kakao_20260917_202709424.mp4",
+    "kakao_20260917_3.mp4",
+    "kakao_20260917_4.mp4",
+    "kakao_20260917_5.mp4",
+    "RoadAccidents002_x264.mp4",
+    "RoadAccidents010_x264.mp4",
+    "RoadAccidents128_x264.mp4",
+    "Robbery048_x264.mp4",
+    "Shoplifting034_x264.mp4",
+    "Stealing062_x264.mp4",
+    "testvideo_seo_last160_event277.mp4",
+    "violence_20260825_event182_score0.58.mp4",
+    "violence_20260825_event184.mp4"
+  ],
+  "missing_conditions": {
+    "Assault006_x264.mp4": [
+      "h264_600k"
+    ],
+    "Burglary017_x264.mp4": [
+      "h264_600k"
+    ]
+  },
+  "category_change_count": 1,
+  "category_changes": [
+    {
+      "video": "Abuse028_x264.mp4",
+      "mp4v": {
+        "category_id": 1,
+        "confidence": 0.3151,
+        "type": "CRITICAL"
+      },
+      "h264_600k": {
+        "category_id": 2,
+        "confidence": 0.3174,
+        "type": "CRITICAL"
+      }
+    }
+  ],
+  "hard_failure_files": {
+    "Assault006_x264.mp4": 50,
+    "Burglary017_x264.mp4": 50
+  },
+  "interpretation": {
+    "Assault006_x264.mp4": "h264_600k 결과는 없지만 동일 내용·동일 원본 크기의 01_Violence_Assault_Assault006_x264.mp4에서 성공했다.",
+    "Burglary017_x264.mp4": "h264_600k 결과가 없으며 180초 ReadTimeout 흔적이 있다."
+  }
+}

@@ -1,10 +1,17 @@
 preflight=PASS
-checked_on=Jetson
 main_pid=5563
 current_encoder=mp4v
 candidate_encoder=h264
 candidate_bitrate=600000
-candidate_uploader_sha256=248a15b0edd1737e50545fe7d77fd6ea38f925921c85fc0abd967890bf0aee67
-candidate_worker_sha256=91700efafa09c755bb30ad7438b9c6c7ab49c31fc3f08e51c4dda88a4e7a30e2
-candidate_start_all_sha256=62bcb38cea38f6ed9d2eb1738c74a556a766918e8513f79e09ed62b88465eda6
-candidate_restart_component_sha256=9c268d3823296f82300d5df11889caa5b2a12e7951b96a73a62d414d5c8d0536
+dev_shm_usage:
+Filesystem      1B-blocks  Used  Available Use% Mounted on
+tmpfs          3582443520 57344 3582386176   1% /dev/shm
+memory_snapshot:
+              total        used        free      shared  buff/cache   available
+Mem:           6832        4442         869          51        1520        2138
+Swap:          3416        1076        2339
+ba020a8d8a534539439e72c44b60d2fa6d8bb5ba8576f7ab6cc3460f32d89135  /tmp/codex_h264_cutover_review2/candidate/main.py
+5ea7aaaee1d72370011fd19f4b5193942b9710aa9a6fc4a29cd6da258d8f4336  /tmp/codex_h264_cutover_review2/candidate/uploader.py
+91700efafa09c755bb30ad7438b9c6c7ab49c31fc3f08e51c4dda88a4e7a30e2  /tmp/codex_h264_cutover_review2/candidate/h264_encoder_worker.py
+62bcb38cea38f6ed9d2eb1738c74a556a766918e8513f79e09ed62b88465eda6  /tmp/codex_h264_cutover_review2/candidate/start_all.sh
+9c268d3823296f82300d5df11889caa5b2a12e7951b96a73a62d414d5c8d0536  /tmp/codex_h264_cutover_review2/candidate/restart_component.sh

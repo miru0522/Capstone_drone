@@ -1,0 +1,15 @@
+서버 VideoMAE 판정 재집계 (2026-09-29 정정)
+
+- 입력 JSONL 파일: 30개
+- mp4v와 H264 600 kbps가 모두 성공한 영상: 28/30
+- H264 600 kbps 결과 누락:
+  - Assault006_x264.mp4: 원 실행은 180초 ReadTimeout으로 중단됐다. 동일 내용·동일 원본 크기의 01_Violence_Assault_Assault006_x264.mp4에서는 H264 600 kbps가 성공했다.
+  - Burglary017_x264.mp4: 180초 ReadTimeout으로 중단됐으며 대체 결과가 없다.
+- 카테고리 변경: 1/28
+  - Abuse028_x264.mp4: mp4v categoryId=1, score=0.3151, CRITICAL → H264 600 kbps categoryId=2, score=0.3174, CRITICAL
+- 비 JSON 오류가 포함된 파일: 2개(각 50줄). 이전 분석의 errors=0은 비 JSON traceback을 무시한 잘못된 집계였다.
+
+결론: H264 600 kbps 서버 판정은 30/30 완료로 표현할 수 없다. 직접 짝 비교는 28/30이며, 경보 등급은 유지됐지만 카테고리 변경 1건과 미커버 1건(Burglary017)이 남아 있다. 서버 재전송 없이 기존 원시 자료만 재집계했다.
+
+기계 판독 결과: analysis_corrected.json
+재집계 코드: ../analyze_server_judgment.py

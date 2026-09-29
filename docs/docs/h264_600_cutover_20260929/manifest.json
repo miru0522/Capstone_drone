@@ -1,15 +1,18 @@
 {
   "captured_at": "2026-09-29",
+  "line_endings": "LF enforced by repository .gitattributes",
   "jetson_branch": "vadclip-v4-20260831",
   "jetson_head": "f1fade2701d085bc633c8f8cd438fde0abee67f2",
   "baseline": {
+    "main.py": "e6ab8de866cd7a488362f8fb71708dfb70773603481ab16003a33eaf6f9cb5e8",
     "uploader.py": "ac214f96331a63630bba76179969059d82667db2e915fd5614d834c3a1561011",
     "h264_encoder_worker.py": null,
     "start_all.sh": "b1915fde5812780303ae486bf3b752f47a225ee0799fd4819a5f2ad79ae85936",
     "restart_component.sh": "e124b1b924aa90f94a29dc94c6d423fa70d1cfb1a1086456c728f0baac7d514b"
   },
   "candidate": {
-    "uploader.py": "248a15b0edd1737e50545fe7d77fd6ea38f925921c85fc0abd967890bf0aee67",
+    "main.py": "ba020a8d8a534539439e72c44b60d2fa6d8bb5ba8576f7ab6cc3460f32d89135",
+    "uploader.py": "5ea7aaaee1d72370011fd19f4b5193942b9710aa9a6fc4a29cd6da258d8f4336",
     "h264_encoder_worker.py": "91700efafa09c755bb30ad7438b9c6c7ab49c31fc3f08e51c4dda88a4e7a30e2",
     "start_all.sh": "62bcb38cea38f6ed9d2eb1738c74a556a766918e8513f79e09ed62b88465eda6",
     "restart_component.sh": "9c268d3823296f82300d5df11889caa5b2a12e7951b96a73a62d414d5c8d0536"
