@@ -1,0 +1,60 @@
+{
+  "video": "/home/hpc/drone_2026/video/kakao_20260914.mp4",
+  "config": {
+    "clip_encoder": "h264",
+    "h264_bitrate": 600000,
+    "upload_mode": "B",
+    "worker_path": "/tmp/h264_600_reapply_20260930/candidate/h264_encoder_worker.py"
+  },
+  "encodes": [
+    {
+      "name": "mp4v",
+      "elapsed_sec": 2.0292121039965423,
+      "size_bytes": 423456,
+      "decoded_frames": 81,
+      "worker_pid": null
+    },
+    {
+      "name": "h264_cold",
+      "elapsed_sec": 2.791622983997513,
+      "size_bytes": 662322,
+      "decoded_frames": 81,
+      "worker_pid": 8416
+    },
+    {
+      "name": "h264_warm",
+      "elapsed_sec": 1.347202158998698,
+      "size_bytes": 662322,
+      "decoded_frames": 81,
+      "worker_pid": 8416
+    }
+  ],
+  "mock_posts": [
+    {
+      "url": "http://203.249.90.3:8031/analyze-video",
+      "data": {
+        "drone_id": "DR-01",
+        "anomaly_score": "0.654321"
+      },
+      "timeout": 180,
+      "video_size_bytes": 662322
+    },
+    {
+      "url": "http://203.249.90.3:8031/analyze-video",
+      "data": {
+        "drone_id": "DR-01"
+      },
+      "timeout": 180,
+      "video_size_bytes": 662322
+    }
+  ],
+  "mock_responses": [
+    {
+      "mock": true
+    },
+    {
+      "mock": true
+    }
+  ],
+  "status": "PASS"
+}

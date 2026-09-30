@@ -1,0 +1,45 @@
+{
+  "timeout": {
+    "elapsed_sec": 1.0578794049943099,
+    "error": "H264 인코딩 제한시간 초과: 0.8초; worker_output=reate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+    "worker_after": null,
+    "state": {
+      "worker_starts": 1,
+      "jobs_started": 1,
+      "total_successes": 0,
+      "total_failures": 1,
+      "consecutive_failures": 1,
+      "last_worker_pid": 9442,
+      "status": "error",
+      "active_pid": null,
+      "active_output_path": null,
+      "last_started_at": 1790789349.2214384,
+      "last_failed_at": 1790789349.8649788,
+      "last_elapsed_sec": 0.8410399349959334,
+      "last_error": "t=reate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800"
+    }
+  },
+  "recovery": {
+    "elapsed_sec": 1.8072007869996014,
+    "worker_pid": 9450,
+    "decoded_frames": 81,
+    "size_bytes": 662322,
+    "state": {
+      "worker_starts": 2,
+      "jobs_started": 2,
+      "total_successes": 1,
+      "total_failures": 1,
+      "consecutive_failures": 0,
+      "last_worker_pid": 9450,
+      "status": "ok",
+      "active_pid": null,
+      "active_output_path": null,
+      "last_started_at": 1790789350.2588832,
+      "last_failed_at": 1790789349.8649788,
+      "last_elapsed_sec": 1.588029495003866,
+      "last_error": null,
+      "last_succeeded_at": 1790789351.6711504
+    }
+  },
+  "status": "PASS"
+}

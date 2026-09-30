@@ -1,0 +1,41 @@
+{
+  "captured_at": "2026-10-01",
+  "jetson_branch": "vadclip-v4-20260831",
+  "jetson_head": "2007b8f",
+  "line_endings": "LF",
+  "baseline": {
+    "main.py": "f4a54398a169004a4721d4edfe8b79d26fbe082a8d1829e876ed4bbd872bf887",
+    "uploader.py": "ac214f96331a63630bba76179969059d82667db2e915fd5614d834c3a1561011",
+    "h264_encoder_worker.py": null,
+    "start_all.sh": "b1915fde5812780303ae486bf3b752f47a225ee0799fd4819a5f2ad79ae85936",
+    "restart_component.sh": "e124b1b924aa90f94a29dc94c6d423fa70d1cfb1a1086456c728f0baac7d514b"
+  },
+  "candidate": {
+    "main.py": "47a231d5df45a6e0feac91145db80dc860dc97613aa9105c99ab742e6c923701",
+    "uploader.py": "5ea7aaaee1d72370011fd19f4b5193942b9710aa9a6fc4a29cd6da258d8f4336",
+    "h264_encoder_worker.py": "91700efafa09c755bb30ad7438b9c6c7ab49c31fc3f08e51c4dda88a4e7a30e2",
+    "start_all.sh": "62bcb38cea38f6ed9d2eb1738c74a556a766918e8513f79e09ed62b88465eda6",
+    "restart_component.sh": "9c268d3823296f82300d5df11889caa5b2a12e7951b96a73a62d414d5c8d0536"
+  },
+  "approved_source": {
+    "commit": "7f273bb",
+    "three_way_match": [
+      "uploader.py",
+      "h264_encoder_worker.py",
+      "start_all.sh",
+      "restart_component.sh"
+    ],
+    "main_policy": "Jetson current uncommitted PeriodicRingRecorder code plus only the approved CLIP_ENCODER configuration logging diff"
+  },
+  "runtime": {
+    "upload_mode": "B",
+    "clip_encoder": "h264",
+    "h264_bitrate": 600000,
+    "maxperf_enable": false
+  },
+  "test_scripts": {
+    "p0_parent_integration.py": "c614d267d0a2c8b9fdab390eae9619a620d18197d0207c83280931e29d56dc72",
+    "p0_concurrent_encoders.py": "2a21a9156c93e3cd9d9ac12b1f22a1e552a857cf72b7a5e05a5fb45f2768dbca",
+    "p0_timeout_recovery.py": "30d9ef10159bed63146bb5a1e33cea36129a8e48358f9888863d500bb87f04e3"
+  }
+}

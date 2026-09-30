@@ -1,0 +1,186 @@
+{
+  "video": "/home/hpc/drone_2026/video/kakao_20260914.mp4",
+  "rounds": [
+    {
+      "round": 1,
+      "h264_600_sec": 1.8399767570008407,
+      "periodic_4m_sec": 1.8694421320033143,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5788924,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 2,
+      "h264_600_sec": 1.3624914360043476,
+      "periodic_4m_sec": 1.536980748998758,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5783800,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 3,
+      "h264_600_sec": 1.3705920409993269,
+      "periodic_4m_sec": 1.5549239690008108,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5784152,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 4,
+      "h264_600_sec": 1.3549070880035288,
+      "periodic_4m_sec": 1.5205315069979406,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5779008,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 5,
+      "h264_600_sec": 1.350675854999281,
+      "periodic_4m_sec": 1.5435761970002204,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5782328,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 6,
+      "h264_600_sec": 1.3348866870001075,
+      "periodic_4m_sec": 1.5204496120059048,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5779884,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 7,
+      "h264_600_sec": 1.333850542003347,
+      "periodic_4m_sec": 1.5192796109986375,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5778432,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 8,
+      "h264_600_sec": 1.3351481310019153,
+      "periodic_4m_sec": 1.5310275189985987,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5773912,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 9,
+      "h264_600_sec": 1.3374906719982391,
+      "periodic_4m_sec": 1.5313097850012127,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5775284,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    },
+    {
+      "round": 10,
+      "h264_600_sec": 1.330065062000358,
+      "periodic_4m_sec": 1.524847017994034,
+      "h264_600_size": 662322,
+      "periodic_4m_size": 3967508,
+      "h264_600_frames": 81,
+      "periodic_4m_frames": 81,
+      "persistent_worker_pid": 8675,
+      "periodic_stdout": "Opening in BLOCKING MODE",
+      "periodic_stderr": "NvMMLiteOpen : Block : BlockType = 4 \n===== NvVideo: NVENC =====\nNvMMLiteBlockCreate : Block : BlockType = 4 \nH264: Profile = 66, Level = 0 \nNVMEDIA: Need to set EMC bandwidth : 112800 \nNVMEDIA: Need to set EMC bandwidth : 112800",
+      "resource_after_round": {
+        "mem_available_kib": 5778892,
+        "swap_free_kib": 3498504,
+        "shm_free_bytes": 3456466944
+      }
+    }
+  ],
+  "resource_before": {
+    "mem_available_kib": 5856540,
+    "swap_free_kib": 3498504,
+    "shm_free_bytes": 3456466944
+  },
+  "resource_after": {
+    "mem_available_kib": 5779064,
+    "swap_free_kib": 3498504,
+    "shm_free_bytes": 3456466944
+  },
+  "status": "PASS"
+}
