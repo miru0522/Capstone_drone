@@ -66,6 +66,7 @@ import math
 import base64
 import tempfile
 import subprocess
+import shutil
 import asyncio
 import concurrent.futures
 import logging
@@ -152,10 +153,108 @@ STREAM_DEFAULT_WIDTH = 1280
 STREAM_DEFAULT_HEIGHT = 720
 STREAM_DEFAULT_QUALITY = 70
 
+# PLAY_AUDIO 재생 설정. TTS_AUDIO_SINK가 비어 있으면 PulseAudio의 USB sink를
+# 우선 탐색하고, 없을 때 PulseAudio 기본 sink를 사용한다.
+TTS_AUDIO_SINK = os.environ.get("TTS_AUDIO_SINK", "").strip()
+TTS_PLAYBACK_TIMEOUT_SEC = float(os.environ.get("TTS_PLAYBACK_TIMEOUT_SEC", "120"))
+TTS_ALLOW_APLAY_FALLBACK = os.environ.get(
+    "TTS_ALLOW_APLAY_FALLBACK", "false"
+).strip().lower() in ("1", "true", "yes", "on")
+
+
+def _run_audio_command(command: List[str], timeout: float) -> subprocess.CompletedProcess:
+    """오디오 명령을 실행하고 실패 시 stderr가 포함된 예외를 발생시킨다."""
+    result = subprocess.run(
+        command,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        timeout=timeout,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "출력 없음").strip()
+        raise RuntimeError(
+            f"{os.path.basename(command[0])} 종료코드={result.returncode}: {detail}"
+        )
+    return result
+
+
+def _find_pulseaudio_sink() -> str:
+    """환경변수 또는 pactl에서 PLAY_AUDIO에 사용할 PulseAudio sink를 고른다."""
+    if TTS_AUDIO_SINK:
+        return TTS_AUDIO_SINK
+
+    pactl = shutil.which("pactl")
+    if pactl is None:
+        raise RuntimeError("pactl을 찾을 수 없음(pulseaudio-utils 설치 확인 필요)")
+
+    result = _run_audio_command([pactl, "list", "sinks", "short"], timeout=5.0)
+    sink_names = []
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) >= 2:
+            sink_names.append(fields[1])
+
+    if not sink_names:
+        raise RuntimeError("PulseAudio sink가 없음")
+
+    usb_sinks = [name for name in sink_names if "usb" in name.lower()]
+    if usb_sinks:
+        return usb_sinks[0]
+
+    info_result = _run_audio_command([pactl, "info"], timeout=5.0)
+    default_sink = ""
+    for line in info_result.stdout.splitlines():
+        if line.lower().startswith("default sink:"):
+            default_sink = line.split(":", 1)[1].strip()
+            break
+    if default_sink and default_sink in sink_names:
+        logger.warning(
+            "USB PulseAudio sink를 찾지 못해 기본 sink를 사용합니다: %s", default_sink
+        )
+        return default_sink
+
+    raise RuntimeError(
+        "USB sink를 찾지 못했고 PulseAudio 기본 sink도 확인할 수 없음: "
+        + ", ".join(sink_names)
+    )
+
+
+def _play_tts_file(path: str) -> None:
+    """PulseAudio로 TTS 파일을 재생한다. raw ALSA 폴백은 명시적으로 켠 경우만 쓴다."""
+    paplay = shutil.which("paplay")
+    try:
+        if paplay is None:
+            raise RuntimeError("paplay를 찾을 수 없음(pulseaudio-utils 설치 확인 필요)")
+        sink = _find_pulseaudio_sink()
+        logger.info("TTS 출력 장치: PulseAudio sink=%s", sink)
+        _run_audio_command(
+            [paplay, f"--device={sink}", path],
+            timeout=TTS_PLAYBACK_TIMEOUT_SEC,
+        )
+        return
+    except Exception as pulse_error:
+        if not TTS_ALLOW_APLAY_FALLBACK:
+            raise RuntimeError(
+                f"PulseAudio 재생 실패(무음 성공 방지를 위해 ALSA 폴백 안 함): {pulse_error}"
+            ) from pulse_error
+
+        aplay = shutil.which("aplay")
+        if aplay is None:
+            raise RuntimeError(
+                f"PulseAudio 재생 실패 후 aplay도 찾을 수 없음: {pulse_error}"
+            ) from pulse_error
+        logger.warning(
+            "PulseAudio 재생 실패, TTS_ALLOW_APLAY_FALLBACK 설정에 따라 ALSA로 재시도: %s",
+            pulse_error,
+        )
+        _run_audio_command([aplay, path], timeout=TTS_PLAYBACK_TIMEOUT_SEC)
+
 
 def play_tts_audio_base64(b64_audio: str, event_id: Optional[int] = None) -> None:
     """
-    STOMP PLAY_AUDIO의 audioBase64를 디코딩해 wav 저장 후 aplay 재생.
+    STOMP PLAY_AUDIO의 audioBase64를 디코딩해 wav 저장 후 PulseAudio로 재생.
     재생 완료 후 eventId가 있으면 방송완료 콜백을 호출한다(2026-08-17 신규).
     """
     path = None
@@ -166,7 +265,7 @@ def play_tts_audio_base64(b64_audio: str, event_id: Optional[int] = None) -> Non
         with open(path, "wb") as f:
             f.write(audio_bytes)
         logger.info(f"🔊 TTS 재생 시작: {path} ({len(audio_bytes)} bytes)")
-        subprocess.run(["aplay", path], check=True)
+        _play_tts_file(path)
         logger.info("✅ TTS 재생 완료")
 
         if event_id is not None:
