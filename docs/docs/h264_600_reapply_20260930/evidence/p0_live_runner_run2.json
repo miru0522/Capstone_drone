@@ -1,0 +1,12 @@
+{
+  "started_at": 1790821236.1235173,
+  "completed_at": 1790821487.112495,
+  "elapsed_sec": 250.9889795780182,
+  "main_pid": 12577,
+  "returncode": -9,
+  "timed_out": true,
+  "processes_before": [],
+  "processes_after": [],
+  "live_result_status": "FAIL",
+  "live_result_present": true
+}

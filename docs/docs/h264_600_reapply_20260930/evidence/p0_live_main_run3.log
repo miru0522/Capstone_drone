@@ -1,0 +1,131 @@
+2026-10-01 23:29:31,178 [INFO] main: 분석 업로드 설정: mode=B, drone_id=DR-01, url=http://203.249.90.3:8031/analyze-video, encoder=h264
+2026-10-01 23:29:31,179 [INFO] main: [Hover] command_receiver 호버 요청 채널 준비
+2026-10-01 23:29:31,181 [INFO] main: [StreamUpload] 업로드 감시 스레드 시작
+GST_ARGUS: Creating output stream
+CONSUMER: Waiting until producer is connected...
+GST_ARGUS: Available Sensor modes :
+GST_ARGUS: 3280 x 2464 FR = 21.000000 fps Duration = 47619048 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 3280 x 1848 FR = 28.000001 fps Duration = 35714284 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1920 x 1080 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1640 x 1232 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1280 x 720 FR = 59.999999 fps Duration = 16666667 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: Running with following settings:
+   Camera index = 0 
+   Camera mode  = 2 
+   Output Stream W = 1920 H = 1080 
+   seconds to Run    = 0 
+   Frame Rate = 29.999999 
+GST_ARGUS: Setup Complete, Starting captures for 0 seconds
+GST_ARGUS: Starting repeat capture requests.
+CONSUMER: Producer has connected; continuing.
+[ WARN:0] global ../modules/videoio/src/cap_gstreamer.cpp (935) open OpenCV | GStreamer warning: Cannot query video position: status=0, value=-1, duration=-1
+2026-10-01 23:29:33,356 [INFO] main: CSI 카메라 초기화 및 첫 프레임 확인 완료
+2026-10-01 23:29:33,357 [INFO] anomaly_model_trt: VadCLIP 초기화 시작
+2026-10-01 23:29:48,529 [INFO] vadclip_adapter_trt: VadCLIP live temporal mapping: FPS=9, window=48 frames (5.333s), sample_indices=[0, 5, 10, 14, 19, 24, 29, 34, 38, 43]
+2026-10-01 23:30:24,500 [INFO] vadclip_adapter_trt: VadCLIP checkpoint strict load PASS (349 keys)
+[10/01/2026-23:30:36] [TRT] [W] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+2026-10-01 23:30:40,480 [INFO] vadclip_adapter_trt: TensorRT CLIP visual loaded: /home/hpc/edge_vadclip_2026/trt/clip_visual_vitb16_b1_10_fp16.engine, sha=973557212ba947da9f50eeb2e458cc5cd6e403f83858223f32f6e881071cfb69, profile min=(1, 3, 224, 224) opt=(10, 3, 224, 224) max=(10, 3, 224, 224), crop=5
+2026-10-01 23:30:40,480 [INFO] anomaly_model_trt: ✅ AnomalyPipeline(VadCLIP) 초기화 완료
+2026-10-01 23:30:40,481 [INFO] anomaly_model_trt: VadCLIP warmup 시작
+2026-10-01 23:30:44,465 [INFO] vadclip_adapter_trt: VadCLIP warmup PASS: score=0.001370, feature_buffer reset to 0
+2026-10-01 23:30:44,466 [INFO] anomaly_model_trt: VadCLIP warmup 완료: 3985.2ms
+2026-10-01 23:30:44,467 [INFO] main: clip upload worker 시작
+2026-10-01 23:30:44,469 [INFO] main: VadCLIP 추론 worker 시작
+2026-10-01 23:30:44,470 [INFO] main: [로컬녹화] 요청 감시 시작 (state=/tmp/h264_600_reapply_live_periodic.json, output=/home/hpc/drone_2026/video/xaviernx)
+2026-10-01 23:30:44,471 [INFO] main: 캡처 루프 시작 (FPS=9, 버퍼=81프레임/9초, 추론주기=48프레임/5.33초)
+2026-10-01 23:30:45,480 [INFO] main: [진단] 최근 1.0초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:46,591 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:47,702 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:48,702 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:50,363 [INFO] main: [진단] 최근 1.7초간 처리프레임=9(목표 9), 밀린시간누적=559ms
+2026-10-01 23:30:51,169 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=804.1ms, feature_buffer=10/256, score=0.214094
+2026-10-01 23:30:51,170 [INFO] main: [P0-LIVE] VadCLIP score=0.214094 (운영 트리거 경로 차단)
+2026-10-01 23:30:51,385 [INFO] main: [진단] 최근 1.0초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:52,391 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:53,500 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:54,588 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:54,680 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=589.5ms
+2026-10-01 23:30:55,468 [INFO] uploader: h264_persistent_worker_started pid=14901 log=/tmp/drone_h264_worker.log
+2026-10-01 23:30:55,591 [INFO] main: [진단] 최근 1.0초간 처리프레임=8(목표 9), 밀린시간누적=110ms
+2026-10-01 23:30:56,681 [INFO] main: [진단] 최근 1.1초간 처리프레임=4(목표 9), 밀린시간누적=646ms
+2026-10-01 23:30:57,040 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=536.4ms, feature_buffer=20/256, score=0.029710
+2026-10-01 23:30:57,041 [INFO] main: [P0-LIVE] VadCLIP score=0.029710 (운영 트리거 경로 차단)
+2026-10-01 23:30:57,682 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:58,795 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:30:59,904 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:00,517 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_h4j3r66q.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:00,520 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=881175 bytes, elapsed=5.840s
+2026-10-01 23:31:01,021 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:01,207 [INFO] main: [P0-LIVE] encode={'sequence': 1, 'phase': 'cold', 'elapsed_sec': 6.08209890499711, 'size_bytes': 881175, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 2, 'finished_at': 1790865061.207182}
+2026-10-01 23:31:01,636 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=226.8ms
+2026-10-01 23:31:03,037 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_hh4wvnv7.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:03,041 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=876296 bytes, elapsed=1.403s
+2026-10-01 23:31:03,113 [INFO] main: [진단] 최근 2.1초간 처리프레임=6(목표 9), 밀린시간누적=1326ms
+2026-10-01 23:31:03,553 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=424.0ms, feature_buffer=30/256, score=0.040310
+2026-10-01 23:31:03,554 [INFO] main: [P0-LIVE] VadCLIP score=0.040310 (운영 트리거 경로 차단)
+2026-10-01 23:31:03,609 [INFO] main: [P0-LIVE] encode={'sequence': 2, 'phase': 'warm', 'elapsed_sec': 1.6420387140096864, 'size_bytes': 876296, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 3, 'finished_at': 1790865063.609389}
+2026-10-01 23:31:04,123 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=311.7ms
+2026-10-01 23:31:04,146 [INFO] main: [진단] 최근 1.0초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:05,241 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:05,702 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_s2adi2jx.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:05,705 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=874014 bytes, elapsed=1.557s
+2026-10-01 23:31:06,067 [INFO] main: [P0-LIVE] encode={'sequence': 3, 'phase': 'warm', 'elapsed_sec': 1.6760809060069732, 'size_bytes': 874014, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 3, 'finished_at': 1790865066.066969}
+2026-10-01 23:31:06,343 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:06,412 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=143.3ms
+2026-10-01 23:31:07,448 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:07,537 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_vcmlmm31.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:07,539 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=872295 bytes, elapsed=1.126s
+2026-10-01 23:31:08,016 [INFO] main: [P0-LIVE] encode={'sequence': 4, 'phase': 'warm', 'elapsed_sec': 1.347632242992404, 'size_bytes': 872295, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 3, 'finished_at': 1790865068.016799}
+2026-10-01 23:31:08,304 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=85.8ms
+2026-10-01 23:31:08,544 [INFO] main: [진단] 최근 1.1초간 처리프레임=8(목표 9), 밀린시간누적=97ms
+2026-10-01 23:31:08,947 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=353.5ms, feature_buffer=40/256, score=0.025790
+2026-10-01 23:31:08,947 [INFO] main: [P0-LIVE] VadCLIP score=0.025790 (운영 트리거 경로 차단)
+2026-10-01 23:31:09,498 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_6lzr2na_.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:09,500 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=882472 bytes, elapsed=1.175s
+2026-10-01 23:31:09,594 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:09,962 [INFO] main: [P0-LIVE] encode={'sequence': 5, 'phase': 'warm', 'elapsed_sec': 1.3876844019978307, 'size_bytes': 882472, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 4, 'finished_at': 1790865069.9628153}
+2026-10-01 23:31:10,314 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=149.5ms
+2026-10-01 23:31:10,594 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:11,442 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_0t16r3ku.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:11,444 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=872725 bytes, elapsed=1.129s
+2026-10-01 23:31:11,595 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:11,916 [INFO] main: [P0-LIVE] encode={'sequence': 6, 'phase': 'warm', 'elapsed_sec': 1.3459329309989698, 'size_bytes': 872725, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 4, 'finished_at': 1790865071.9166958}
+2026-10-01 23:31:12,213 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=94.7ms
+2026-10-01 23:31:12,706 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:13,362 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_y3l5mrns.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:13,364 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=875175 bytes, elapsed=1.128s
+2026-10-01 23:31:13,706 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:13,834 [INFO] main: [P0-LIVE] encode={'sequence': 7, 'phase': 'warm', 'elapsed_sec': 1.3475133159954567, 'size_bytes': 875175, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 4, 'finished_at': 1790865073.8345253}
+2026-10-01 23:31:14,198 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=161.6ms
+2026-10-01 23:31:14,635 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=343.3ms, feature_buffer=50/256, score=0.024727
+2026-10-01 23:31:14,636 [INFO] main: [P0-LIVE] VadCLIP score=0.024727 (운영 트리거 경로 차단)
+2026-10-01 23:31:14,735 [INFO] main: [진단] 최근 1.0초간 처리프레임=6(목표 9), 밀린시간누적=363ms
+2026-10-01 23:31:15,343 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_j6y4w647.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:15,346 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=880646 bytes, elapsed=1.147s
+2026-10-01 23:31:15,736 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:15,807 [INFO] main: [P0-LIVE] encode={'sequence': 8, 'phase': 'warm', 'elapsed_sec': 1.3653620139957638, 'size_bytes': 880646, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 5, 'finished_at': 1790865075.807478}
+2026-10-01 23:31:16,102 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=92.3ms
+2026-10-01 23:31:16,846 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:17,238 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_cqe7zbtj.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:17,240 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=877047 bytes, elapsed=1.117s
+2026-10-01 23:31:17,712 [INFO] main: [P0-LIVE] encode={'sequence': 9, 'phase': 'warm', 'elapsed_sec': 1.3361116019950714, 'size_bytes': 877047, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 5, 'finished_at': 1790865077.7119799}
+2026-10-01 23:31:17,958 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:18,049 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=135.7ms
+2026-10-01 23:31:19,069 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:19,156 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_jsgzy7o0.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:19,158 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=873179 bytes, elapsed=1.108s
+2026-10-01 23:31:19,692 [INFO] main: [P0-LIVE] encode={'sequence': 10, 'phase': 'warm', 'elapsed_sec': 1.3486801450053463, 'size_bytes': 873179, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 5, 'finished_at': 1790865079.691985}
+2026-10-01 23:31:19,989 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=347.8ms, feature_buffer=60/256, score=0.026113
+2026-10-01 23:31:19,989 [INFO] main: V6 upload snapshot 준비: frames=81, resolution=960x540, elapsed=95.5ms
+2026-10-01 23:31:19,990 [INFO] main: [P0-LIVE] VadCLIP score=0.026113 (운영 트리거 경로 차단)
+2026-10-01 23:31:20,069 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:21,123 [INFO] uploader: h264_job_completed pid=14901 mode=persistent output=/tmp/anomaly_clip_h264_wmkjygk4.mp4.partial frames=81 payload_bytes=125971200
+2026-10-01 23:31:21,126 [INFO] uploader: h264(HW) 인코딩 완료: frames=81, fps=9, bitrate=600000, size=875172 bytes, elapsed=1.115s
+2026-10-01 23:31:21,180 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-01 23:31:21,505 [INFO] main: [P0-LIVE] encode={'sequence': 11, 'phase': 'warm', 'elapsed_sec': 1.2601189490087563, 'size_bytes': 875172, 'decoded_frames': 81, 'worker_pid': 14901, 'inference_count_at_finish': 6, 'finished_at': 1790865081.5053933}
+2026-10-01 23:31:22,405 [INFO] main: CSI 카메라 해제 완료

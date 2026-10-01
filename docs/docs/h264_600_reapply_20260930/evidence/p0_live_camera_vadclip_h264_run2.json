@@ -1,0 +1,1 @@
+{"mode": "live_csi_vadclip_h264_no_upload_no_hover", "encodes": [], "inference_events": [{"sequence": 1, "elapsed_sec": 0.5819728509959532, "score": 0.19119160870711008, "completed_at": 1790821354.8510764}], "status": "FAIL", "error": "TimeoutError: 라이브 링버퍼/VadCLIP 첫 추론 준비 90초 초과", "inference_count": 1, "consecutive_inference_failures": 0, "completed_at": 1790821438.4739437}
