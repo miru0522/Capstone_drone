@@ -1,0 +1,294 @@
+{
+  "started_at": 1790958964.5897033,
+  "configuration": {
+    "width": 960,
+    "height": 540,
+    "fps": 9,
+    "frames": 81,
+    "bitrate": 600000,
+    "sequential": 1,
+    "idle_seconds": []
+  },
+  "resources": {
+    "before": {
+      "raw": "10-03-2026 01:36:05 RAM 1610/6833MB (lfb 249x4MB) SWAP 113/3417MB (cached 0MB) CPU [1%@1190,2%@1420,0%@1420,0%@1420,0%@1420,1%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@41C CPU@41.5C thermal@41.15C AO@41C GPU@41C PMIC@50C",
+      "ram_used_mb": 1610,
+      "ram_total_mb": 6833,
+      "lfb_count": 249,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    },
+    "after_start": {
+      "raw": "10-03-2026 01:36:08 RAM 1612/6833MB (lfb 249x4MB) SWAP 113/3417MB (cached 0MB) CPU [0%@1190,1%@1420,0%@1420,1%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@41C CPU@41.5C thermal@41.15C AO@41C GPU@41C PMIC@50C",
+      "ram_used_mb": 1612,
+      "ram_total_mb": 6833,
+      "lfb_count": 249,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    },
+    "after_warmup": {
+      "raw": "10-03-2026 01:36:11 RAM 1621/6833MB (lfb 249x4MB) SWAP 113/3417MB (cached 0MB) CPU [0%@1420,0%@1420,0%@1420,0%@1420,0%@1420,1%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@41.5C CPU@42C thermal@41.3C AO@41C GPU@41C PMIC@50C",
+      "ram_used_mb": 1621,
+      "ram_total_mb": 6833,
+      "lfb_count": 249,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    },
+    "before_close": {
+      "raw": "10-03-2026 01:36:44 RAM 1754/6833MB (lfb 249x4MB) SWAP 113/3417MB (cached 0MB) CPU [7%@1420,0%@1420,0%@1420,1%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@44C CPU@44.5C thermal@43.8C AO@43.5C GPU@43.5C PMIC@50C",
+      "ram_used_mb": 1754,
+      "ram_total_mb": 6833,
+      "lfb_count": 249,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    },
+    "after_close": {
+      "raw": "10-03-2026 01:36:46 RAM 1754/6833MB (lfb 249x4MB) SWAP 113/3417MB (cached 0MB) CPU [0%@1420,0%@1420,0%@1420,1%@1420,1%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@44C CPU@44.5C thermal@43.8C AO@43.5C GPU@43.5C PMIC@50C",
+      "ram_used_mb": 1754,
+      "ram_total_mb": 6833,
+      "lfb_count": 249,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    }
+  },
+  "startup": {
+    "elapsed_sec": 0.412115940998774,
+    "state_result": 2,
+    "current_state": 2,
+    "pending_state": 4
+  },
+  "warmup": {
+    "request_sequence": 1,
+    "encoded_au_count": 2,
+    "first_au_pts": 0,
+    "last_au_pts": 111111111,
+    "first_au_flags": 17472,
+    "push_elapsed_sec": 0.33427929299068637,
+    "pull_elapsed_sec": 0.3472952200099826,
+    "encode_elapsed_sec": 0.34731518899207003,
+    "mux_elapsed_sec": 0.015783164009917527,
+    "total_elapsed_sec": 0.7084054200095125,
+    "size_bytes": 14182,
+    "probe": {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 960,
+          "height": 540,
+          "avg_frame_rate": "9/1",
+          "duration": "0.222222",
+          "nb_frames": "2"
+        }
+      ]
+    }
+  },
+  "sequential": [
+    {
+      "request_sequence": 2,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.794119245983893,
+      "pull_elapsed_sec": 8.811521360999905,
+      "encode_elapsed_sec": 8.811525456985692,
+      "mux_elapsed_sec": 0.019371208996744826,
+      "total_elapsed_sec": 9.177138781000394,
+      "size_bytes": 299821,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_00",
+      "pattern_id": 1,
+      "output": "/tmp/h264_pipeline_reuse_20261002/state_guard_smoke/sequential_00.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "idle": [],
+  "error_injection": {
+    "invalid_input": {
+      "rejected": true,
+      "error": "ValueError: frame size mismatch: index=0, expected=1555200, actual=300"
+    },
+    "after_invalid": {
+      "request_sequence": 3,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.329536153003573,
+      "pull_elapsed_sec": 8.346695651998743,
+      "encode_elapsed_sec": 8.346699588990305,
+      "mux_elapsed_sec": 0.01805338601116091,
+      "total_elapsed_sec": 8.710406313999556,
+      "size_bytes": 297485,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "after_invalid",
+      "pattern_id": 91,
+      "output": "/tmp/h264_pipeline_reuse_20261002/state_guard_smoke/after_invalid.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    },
+    "forced_pipeline_stop": {
+      "detected": true,
+      "error": "PipelineError: pipeline is not usable: current=<enum GST_STATE_NULL of type Gst.State>, pending=<enum GST_STATE_VOID_PENDING of type Gst.State>"
+    },
+    "restart": {
+      "elapsed_sec": 0.330422607017681,
+      "state_result": 2,
+      "current_state": 2,
+      "pending_state": 4
+    },
+    "after_restart": {
+      "request_sequence": 4,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17472,
+      "push_elapsed_sec": 8.31173229002161,
+      "pull_elapsed_sec": 8.329153543018037,
+      "encode_elapsed_sec": 8.329157543019392,
+      "mux_elapsed_sec": 0.016606185992714018,
+      "total_elapsed_sec": 8.693801451998297,
+      "size_bytes": 300672,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "after_restart",
+      "pattern_id": 93,
+      "output": "/tmp/h264_pipeline_reuse_20261002/state_guard_smoke/after_restart.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "status": "PASS",
+  "completed_at": 1790959007.7457843,
+  "elapsed_sec": 43.15608096122742
+}

@@ -1,0 +1,1696 @@
+{
+  "started_at": 1790908210.938784,
+  "configuration": {
+    "width": 960,
+    "height": 540,
+    "fps": 9,
+    "frames": 81,
+    "bitrate": 600000,
+    "sequential": 20,
+    "idle_seconds": [
+      1.0,
+      30.0,
+      300.0
+    ]
+  },
+  "resources": {
+    "before": {
+      "raw": "10-02-2026 11:30:11 RAM 1638/6833MB (lfb 250x4MB) SWAP 114/3417MB (cached 0MB) CPU [1%@1420,0%@1420,14%@1420,0%@1420,0%@1420,1%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@41.5C CPU@42.5C thermal@42C AO@42C GPU@41.5C PMIC@50C",
+      "ram_used_mb": 1638,
+      "ram_total_mb": 6833,
+      "lfb_count": 250,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 114
+    },
+    "after_start": {
+      "raw": "10-02-2026 11:30:14 RAM 1638/6833MB (lfb 250x4MB) SWAP 114/3417MB (cached 0MB) CPU [1%@1420,0%@1420,0%@1420,1%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@42C CPU@42.5C thermal@41.8C AO@42C GPU@42C PMIC@50C",
+      "ram_used_mb": 1638,
+      "ram_total_mb": 6833,
+      "lfb_count": 250,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 114
+    },
+    "after_warmup": {
+      "raw": "10-02-2026 11:30:17 RAM 1646/6833MB (lfb 250x4MB) SWAP 114/3417MB (cached 0MB) CPU [0%@1420,0%@1420,0%@1420,0%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@42C CPU@43C thermal@42.3C AO@42.5C GPU@42C PMIC@50C",
+      "ram_used_mb": 1646,
+      "ram_total_mb": 6833,
+      "lfb_count": 250,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 114
+    },
+    "before_close": {
+      "raw": "10-02-2026 11:40:04 RAM 1778/6833MB (lfb 250x4MB) SWAP 113/3417MB (cached 0MB) CPU [0%@1190,0%@1420,0%@1420,1%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@41.5C CPU@42.5C thermal@41.8C AO@42C GPU@41.5C PMIC@50C",
+      "ram_used_mb": 1778,
+      "ram_total_mb": 6833,
+      "lfb_count": 250,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    },
+    "after_close": {
+      "raw": "10-02-2026 11:40:06 RAM 1778/6833MB (lfb 250x4MB) SWAP 113/3417MB (cached 0MB) CPU [0%@1420,0%@1420,0%@1420,0%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@41.5C CPU@42.5C thermal@42C AO@42C GPU@42C PMIC@50C",
+      "ram_used_mb": 1778,
+      "ram_total_mb": 6833,
+      "lfb_count": 250,
+      "lfb_block_mb": 4,
+      "swap_used_mb": 113
+    }
+  },
+  "startup": {
+    "elapsed_sec": 0.407885227992665,
+    "state_result": 2,
+    "current_state": 2,
+    "pending_state": 4
+  },
+  "warmup": {
+    "request_sequence": 1,
+    "encoded_au_count": 2,
+    "first_au_pts": 0,
+    "last_au_pts": 111111111,
+    "first_au_flags": 17472,
+    "push_elapsed_sec": 0.3694086789910216,
+    "pull_elapsed_sec": 0.3825430430006236,
+    "encode_elapsed_sec": 0.3825461149972398,
+    "mux_elapsed_sec": 0.017452169995522127,
+    "total_elapsed_sec": 0.7457380100095179,
+    "size_bytes": 14182,
+    "probe": {
+      "programs": [],
+      "streams": [
+        {
+          "codec_name": "h264",
+          "width": 960,
+          "height": 540,
+          "avg_frame_rate": "9/1",
+          "duration": "0.222222",
+          "nb_frames": "2"
+        }
+      ]
+    }
+  },
+  "sequential": [
+    {
+      "request_sequence": 2,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 9.958148325007642,
+      "pull_elapsed_sec": 9.975530541007174,
+      "encode_elapsed_sec": 9.975533229007851,
+      "mux_elapsed_sec": 0.01845308899646625,
+      "total_elapsed_sec": 10.33912846801104,
+      "size_bytes": 299821,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_00",
+      "pattern_id": 1,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_00.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 3,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.528323957987595,
+      "pull_elapsed_sec": 8.545532026008004,
+      "encode_elapsed_sec": 8.545537530008005,
+      "mux_elapsed_sec": 0.017348879016935825,
+      "total_elapsed_sec": 8.905570150993299,
+      "size_bytes": 279189,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_01",
+      "pattern_id": 2,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_01.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          },
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 4,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.1586327959958,
+      "pull_elapsed_sec": 8.175667036994128,
+      "encode_elapsed_sec": 8.175672220997512,
+      "mux_elapsed_sec": 0.017362907994538546,
+      "total_elapsed_sec": 8.538910000992473,
+      "size_bytes": 292517,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_02",
+      "pattern_id": 3,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_02.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 5,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.125985466002021,
+      "pull_elapsed_sec": 8.143043688003672,
+      "encode_elapsed_sec": 8.143049224978313,
+      "mux_elapsed_sec": 0.017687649000436068,
+      "total_elapsed_sec": 8.504914849996567,
+      "size_bytes": 302125,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_03",
+      "pattern_id": 4,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_03.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          },
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 6,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.111981408001157,
+      "pull_elapsed_sec": 8.128886766004143,
+      "encode_elapsed_sec": 8.128892239008565,
+      "mux_elapsed_sec": 0.016772420989582315,
+      "total_elapsed_sec": 8.490488080016803,
+      "size_bytes": 288874,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_04",
+      "pattern_id": 5,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_04.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          },
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 7,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.09391938400222,
+      "pull_elapsed_sec": 8.110971808986505,
+      "encode_elapsed_sec": 8.110976673982805,
+      "mux_elapsed_sec": 0.017043047992046922,
+      "total_elapsed_sec": 8.472443467995618,
+      "size_bytes": 297929,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_05",
+      "pattern_id": 6,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_05.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 8,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.133438782009762,
+      "pull_elapsed_sec": 8.15030422998825,
+      "encode_elapsed_sec": 8.150309830001788,
+      "mux_elapsed_sec": 0.017345805012155324,
+      "total_elapsed_sec": 8.512421863997588,
+      "size_bytes": 290755,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_06",
+      "pattern_id": 7,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_06.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          },
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 9,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.098005150997778,
+      "pull_elapsed_sec": 8.113217783014989,
+      "encode_elapsed_sec": 8.11322290400858,
+      "mux_elapsed_sec": 0.017294324992690235,
+      "total_elapsed_sec": 8.473063073004596,
+      "size_bytes": 292618,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_07",
+      "pattern_id": 8,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_07.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 10,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.088529029017081,
+      "pull_elapsed_sec": 8.103925180999795,
+      "encode_elapsed_sec": 8.103930653014686,
+      "mux_elapsed_sec": 0.01763164601288736,
+      "total_elapsed_sec": 8.467231357004493,
+      "size_bytes": 288553,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_08",
+      "pattern_id": 9,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_08.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          },
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 11,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.10484555902076,
+      "pull_elapsed_sec": 8.119911429996137,
+      "encode_elapsed_sec": 8.119916677998845,
+      "mux_elapsed_sec": 0.017750099999830127,
+      "total_elapsed_sec": 8.48500312800752,
+      "size_bytes": 301298,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_09",
+      "pattern_id": 10,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_09.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          },
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 12,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.09877962101018,
+      "pull_elapsed_sec": 8.113885958999163,
+      "encode_elapsed_sec": 8.113892488006968,
+      "mux_elapsed_sec": 0.017505295982118696,
+      "total_elapsed_sec": 8.477916017989628,
+      "size_bytes": 296854,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_10",
+      "pattern_id": 11,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_10.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 13,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.084303021023516,
+      "pull_elapsed_sec": 8.09966670902213,
+      "encode_elapsed_sec": 8.09967259701807,
+      "mux_elapsed_sec": 0.017353556992020458,
+      "total_elapsed_sec": 8.464972737012431,
+      "size_bytes": 278829,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_11",
+      "pattern_id": 12,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_11.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          },
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 14,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.102601229998982,
+      "pull_elapsed_sec": 8.11801319202641,
+      "encode_elapsed_sec": 8.118018762004795,
+      "mux_elapsed_sec": 0.0179611979983747,
+      "total_elapsed_sec": 8.482612516003428,
+      "size_bytes": 306219,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_12",
+      "pattern_id": 13,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_12.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 15,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.101618287008023,
+      "pull_elapsed_sec": 8.117148867982905,
+      "encode_elapsed_sec": 8.117154915991705,
+      "mux_elapsed_sec": 0.01804825899307616,
+      "total_elapsed_sec": 8.485527326993179,
+      "size_bytes": 288038,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_13",
+      "pattern_id": 14,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_13.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          },
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 16,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.091269387979992,
+      "pull_elapsed_sec": 8.10839244700037,
+      "encode_elapsed_sec": 8.108397695992608,
+      "mux_elapsed_sec": 0.01743319400702603,
+      "total_elapsed_sec": 8.467314934008755,
+      "size_bytes": 288447,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_14",
+      "pattern_id": 15,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_14.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          },
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 17,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.145671025005868,
+      "pull_elapsed_sec": 8.162821590987733,
+      "encode_elapsed_sec": 8.162826647021575,
+      "mux_elapsed_sec": 0.017692105990136042,
+      "total_elapsed_sec": 8.524048885999946,
+      "size_bytes": 312776,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_15",
+      "pattern_id": 16,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_15.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 18,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.098566324973945,
+      "pull_elapsed_sec": 8.115740651992382,
+      "encode_elapsed_sec": 8.115745644987328,
+      "mux_elapsed_sec": 0.017546703980769962,
+      "total_elapsed_sec": 8.476514208014123,
+      "size_bytes": 277216,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_16",
+      "pattern_id": 17,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_16.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          },
+          {
+            "mean_bgr": [
+              217.0,
+              40.0,
+              26.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              276.66767068090917,
+              253.11064774125958,
+              290.45653719618707,
+              158.38244852255568
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 19,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.092443239991553,
+      "pull_elapsed_sec": 8.109494503994938,
+      "encode_elapsed_sec": 8.109499688987853,
+      "mux_elapsed_sec": 0.017324596003163606,
+      "total_elapsed_sec": 8.46794593098457,
+      "size_bytes": 292135,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_17",
+      "pattern_id": 18,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_17.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 20,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.087480299000163,
+      "pull_elapsed_sec": 8.102816077996977,
+      "encode_elapsed_sec": 8.102821773994947,
+      "mux_elapsed_sec": 0.09817638498498127,
+      "total_elapsed_sec": 8.551789489982184,
+      "size_bytes": 288127,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_18",
+      "pattern_id": 19,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_18.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          },
+          {
+            "mean_bgr": [
+              178.0,
+              40.0,
+              178.0
+            ],
+            "current_distance": 2.8284271247461903,
+            "other_distances": [
+              163.7925517232087,
+              264.2877220000959,
+              153.8440769090575,
+              211.06397134518247
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "request_sequence": 21,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.119708216021536,
+      "pull_elapsed_sec": 8.134930535015883,
+      "encode_elapsed_sec": 8.134935591020621,
+      "mux_elapsed_sec": 0.017888120986754075,
+      "total_elapsed_sec": 8.503286619990831,
+      "size_bytes": 301724,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "sequential_19",
+      "pattern_id": 20,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/sequential_19.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          },
+          {
+            "mean_bgr": [
+              17.0,
+              30.0,
+              216.0
+            ],
+            "current_distance": 5.0,
+            "other_distances": [
+              252.08133608024215,
+              275.5086205547841,
+              162.61918705983007,
+              167.22739010102381
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "idle": [
+    {
+      "idle_sec": 1.0,
+      "resource_before": {
+        "raw": "10-02-2026 11:33:35 RAM 1872/6833MB (lfb 250x4MB) SWAP 113/3417MB (cached 0MB) CPU [4%@1190,0%@1420,1%@1420,1%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@45.5C CPU@46.5C thermal@45.95C AO@46C GPU@45.5C PMIC@50C",
+        "ram_used_mb": 1872,
+        "ram_total_mb": 6833,
+        "lfb_count": 250,
+        "lfb_block_mb": 4,
+        "swap_used_mb": 113
+      },
+      "result": {
+        "request_sequence": 22,
+        "encoded_au_count": 81,
+        "first_au_pts": 0,
+        "last_au_pts": 8888888880,
+        "first_au_flags": 17408,
+        "push_elapsed_sec": 8.088183004001621,
+        "pull_elapsed_sec": 8.103446236986201,
+        "encode_elapsed_sec": 8.103451517003123,
+        "mux_elapsed_sec": 0.018874213012168184,
+        "total_elapsed_sec": 8.469601571996463,
+        "size_bytes": 297471,
+        "probe": {
+          "programs": [],
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 960,
+              "height": 540,
+              "avg_frame_rate": "9/1",
+              "duration": "9.000000",
+              "nb_frames": "81"
+            }
+          ]
+        },
+        "label": "idle_001s",
+        "pattern_id": 21,
+        "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/idle_001s.mp4",
+        "decode": {
+          "decoded_frames": 81,
+          "boundary_patches": [
+            {
+              "mean_bgr": [
+                28.0,
+                209.0,
+                38.0
+              ],
+              "current_distance": 3.0,
+              "other_distances": [
+                255.3996867656654,
+                255.90818666076316,
+                153.19595294915595,
+                268.0093281958671
+              ]
+            },
+            {
+              "mean_bgr": [
+                28.0,
+                209.0,
+                38.0
+              ],
+              "current_distance": 3.0,
+              "other_distances": [
+                255.3996867656654,
+                255.90818666076316,
+                153.19595294915595,
+                268.0093281958671
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "idle_sec": 30.0,
+      "resource_before": {
+        "raw": "10-02-2026 11:33:48 RAM 1773/6833MB (lfb 250x4MB) SWAP 113/3417MB (cached 0MB) CPU [1%@1420,0%@1420,0%@1420,0%@1420,0%@1420,0%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@45.5C CPU@46.5C thermal@45.6C AO@45.5C GPU@45.5C PMIC@50C",
+        "ram_used_mb": 1773,
+        "ram_total_mb": 6833,
+        "lfb_count": 250,
+        "lfb_block_mb": 4,
+        "swap_used_mb": 113
+      },
+      "result": {
+        "request_sequence": 23,
+        "encoded_au_count": 81,
+        "first_au_pts": 0,
+        "last_au_pts": 8888888880,
+        "first_au_flags": 17408,
+        "push_elapsed_sec": 8.120750205009244,
+        "pull_elapsed_sec": 8.137852535990532,
+        "encode_elapsed_sec": 8.137858008005423,
+        "mux_elapsed_sec": 0.018904357973951846,
+        "total_elapsed_sec": 8.500166532001458,
+        "size_bytes": 279207,
+        "probe": {
+          "programs": [],
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 960,
+              "height": 540,
+              "avg_frame_rate": "9/1",
+              "duration": "9.000000",
+              "nb_frames": "81"
+            }
+          ]
+        },
+        "label": "idle_030s",
+        "pattern_id": 22,
+        "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/idle_030s.mp4",
+        "decode": {
+          "decoded_frames": 81,
+          "boundary_patches": [
+            {
+              "mean_bgr": [
+                217.0,
+                40.0,
+                26.0
+              ],
+              "current_distance": 5.0,
+              "other_distances": [
+                276.66767068090917,
+                253.11064774125958,
+                290.45653719618707,
+                158.38244852255568
+              ]
+            },
+            {
+              "mean_bgr": [
+                217.0,
+                40.0,
+                26.0
+              ],
+              "current_distance": 5.0,
+              "other_distances": [
+                276.66767068090917,
+                253.11064774125958,
+                290.45653719618707,
+                158.38244852255568
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "idle_sec": 300.0,
+      "resource_before": {
+        "raw": "10-02-2026 11:34:30 RAM 1768/6833MB (lfb 250x4MB) SWAP 113/3417MB (cached 0MB) CPU [0%@1190,0%@1420,0%@1420,0%@1420,0%@1420,1%@1420] EMC_FREQ 0% GR3D_FREQ 0% AUX@42.5C CPU@43C thermal@42.8C AO@43C GPU@42.5C PMIC@50C",
+        "ram_used_mb": 1768,
+        "ram_total_mb": 6833,
+        "lfb_count": 250,
+        "lfb_block_mb": 4,
+        "swap_used_mb": 113
+      },
+      "result": {
+        "request_sequence": 24,
+        "encoded_au_count": 81,
+        "first_au_pts": 0,
+        "last_au_pts": 8888888880,
+        "first_au_flags": 17408,
+        "push_elapsed_sec": 8.124843855010113,
+        "pull_elapsed_sec": 8.14226591901388,
+        "encode_elapsed_sec": 8.142271264019655,
+        "mux_elapsed_sec": 0.018114509992301464,
+        "total_elapsed_sec": 8.503721165005118,
+        "size_bytes": 306770,
+        "probe": {
+          "programs": [],
+          "streams": [
+            {
+              "codec_name": "h264",
+              "width": 960,
+              "height": 540,
+              "avg_frame_rate": "9/1",
+              "duration": "9.000000",
+              "nb_frames": "81"
+            }
+          ]
+        },
+        "label": "idle_300s",
+        "pattern_id": 23,
+        "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/idle_300s.mp4",
+        "decode": {
+          "decoded_frames": 81,
+          "boundary_patches": [
+            {
+              "mean_bgr": [
+                28.0,
+                188.0,
+                187.0
+              ],
+              "current_distance": 4.123105625617661,
+              "other_distances": [
+                161.60754932861275,
+                148.65059703882793,
+                288.8200131569833,
+                212.26634212705508
+              ]
+            },
+            {
+              "mean_bgr": [
+                28.0,
+                188.0,
+                187.0
+              ],
+              "current_distance": 4.123105625617661,
+              "other_distances": [
+                161.60754932861275,
+                148.65059703882793,
+                288.8200131569833,
+                212.26634212705508
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "error_injection": {
+    "invalid_input": {
+      "rejected": true,
+      "error": "ValueError: frame size mismatch: index=0, expected=1555200, actual=300"
+    },
+    "after_invalid": {
+      "request_sequence": 26,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17408,
+      "push_elapsed_sec": 8.084189009998227,
+      "pull_elapsed_sec": 8.101547608996043,
+      "encode_elapsed_sec": 8.101553018001141,
+      "mux_elapsed_sec": 0.01863410699297674,
+      "total_elapsed_sec": 8.465081700996961,
+      "size_bytes": 297485,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "after_invalid",
+      "pattern_id": 91,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/after_invalid.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              209.0,
+              38.0
+            ],
+            "current_distance": 3.0,
+            "other_distances": [
+              255.3996867656654,
+              255.90818666076316,
+              153.19595294915595,
+              268.0093281958671
+            ]
+          }
+        ]
+      }
+    },
+    "forced_pipeline_stop": {
+      "detected": true,
+      "error": "PipelineError: push-buffer failed: index=0, flow=<enum GST_FLOW_FLUSHING of type Gst.FlowReturn>"
+    },
+    "restart": {
+      "elapsed_sec": 0.3328704530140385,
+      "state_result": 2,
+      "current_state": 2,
+      "pending_state": 4
+    },
+    "after_restart": {
+      "request_sequence": 28,
+      "encoded_au_count": 81,
+      "first_au_pts": 0,
+      "last_au_pts": 8888888880,
+      "first_au_flags": 17472,
+      "push_elapsed_sec": 8.122825551981805,
+      "pull_elapsed_sec": 8.14045324001927,
+      "encode_elapsed_sec": 8.140455576998647,
+      "mux_elapsed_sec": 0.017408225015969947,
+      "total_elapsed_sec": 8.50414315899252,
+      "size_bytes": 300672,
+      "probe": {
+        "programs": [],
+        "streams": [
+          {
+            "codec_name": "h264",
+            "width": 960,
+            "height": 540,
+            "avg_frame_rate": "9/1",
+            "duration": "9.000000",
+            "nb_frames": "81"
+          }
+        ]
+      },
+      "label": "after_restart",
+      "pattern_id": 93,
+      "output": "/tmp/h264_pipeline_reuse_20261002/final_stability/after_restart.mp4",
+      "decode": {
+        "decoded_frames": 81,
+        "boundary_patches": [
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          },
+          {
+            "mean_bgr": [
+              28.0,
+              188.0,
+              187.0
+            ],
+            "current_distance": 4.123105625617661,
+            "other_distances": [
+              161.60754932861275,
+              148.65059703882793,
+              288.8200131569833,
+              212.26634212705508
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "status": "PASS",
+  "completed_at": 1790908807.6246054,
+  "elapsed_sec": 596.6858215332031
+}

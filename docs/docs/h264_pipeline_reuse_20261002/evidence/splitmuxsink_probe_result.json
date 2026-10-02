@@ -1,0 +1,319 @@
+{
+  "gstreamer": "GStreamer 1.16.3",
+  "requests": [
+    {
+      "request": 0,
+      "push_elapsed_sec": 10.752938130986877
+    },
+    {
+      "request": 1,
+      "push_elapsed_sec": 9.659781569003826
+    },
+    {
+      "request": 2,
+      "push_elapsed_sec": 9.177362682996318
+    }
+  ],
+  "files_visible_before_eos": [
+    "fragment_00.mp4",
+    "fragment_01.mp4"
+  ],
+  "eos_elapsed_sec": 0.008785055979387835,
+  "files": [
+    {
+      "path": "fragment_00.mp4",
+      "frames": 81,
+      "first_mean_bgr": [
+        17.0,
+        30.0,
+        216.0
+      ],
+      "last_mean_bgr": [
+        17.0,
+        30.0,
+        216.0
+      ]
+    },
+    {
+      "path": "fragment_01.mp4",
+      "frames": 80,
+      "first_mean_bgr": [
+        28.0,
+        209.0,
+        38.0
+      ],
+      "last_mean_bgr": [
+        28.0,
+        209.0,
+        38.0
+      ]
+    },
+    {
+      "path": "fragment_02.mp4",
+      "frames": 82,
+      "first_mean_bgr": [
+        28.0,
+        209.0,
+        38.0
+      ],
+      "last_mean_bgr": [
+        217.0,
+        40.0,
+        26.0
+      ]
+    }
+  ],
+  "messages": [
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "queue0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "mux"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "h264parse0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "enc"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "capsfilter1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "nvvconv0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "capsfilter0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "videoconvert0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_STATUS of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "queue0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "h264parse0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "enc"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "capsfilter1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "nvvconv0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "capsfilter0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "videoconvert0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_STATUS of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_STATUS of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_STATUS of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_LATENCY of type Gst.MessageType>",
+      "src": "enc"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_STATUS of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_STATUS of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "mux"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_ASYNC_DONE of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_ELEMENT of type Gst.MessageType>",
+      "src": "mux",
+      "structure": "splitmuxsink-fragment-opened, location=(string)/tmp/h264_pipeline_reuse_20261002/splitmuxsink_probe/fragment_00.mp4, running-time=(guint64)0;"
+    },
+    {
+      "type": "<flags GST_MESSAGE_NEW_CLOCK of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "queue0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "mux"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "h264parse0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "enc"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "capsfilter1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "nvvconv0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "capsfilter0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "videoconvert0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "src"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_START of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink_1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink_1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink_1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer_1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer_1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer_1"
+    },
+    {
+      "type": "<flags GST_MESSAGE_ELEMENT of type Gst.MessageType>",
+      "src": "mux",
+      "structure": "splitmuxsink-fragment-opened, location=(string)/tmp/h264_pipeline_reuse_20261002/splitmuxsink_probe/fragment_01.mp4, running-time=(guint64)8999999991;"
+    },
+    {
+      "type": "<flags GST_MESSAGE_ELEMENT of type Gst.MessageType>",
+      "src": "mux",
+      "structure": "splitmuxsink-fragment-closed, location=(string)/tmp/h264_pipeline_reuse_20261002/splitmuxsink_probe/fragment_00.mp4, running-time=(guint64)8999999991;"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STREAM_START of type Gst.MessageType>",
+      "src": "pipeline0"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "muxer"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink"
+    },
+    {
+      "type": "<flags GST_MESSAGE_STATE_CHANGED of type Gst.MessageType>",
+      "src": "sink"
+    }
+  ]
+}

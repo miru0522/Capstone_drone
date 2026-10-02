@@ -1,0 +1,32 @@
+{
+  "configuration": {
+    "frames": 81,
+    "fps": 9
+  },
+  "results": [
+    {
+      "index": 0,
+      "elapsed_sec": 1.3850097200192977,
+      "reply": {
+        "ok": true
+      },
+      "size_bytes": 316399
+    },
+    {
+      "index": 1,
+      "elapsed_sec": 0.9279440749960486,
+      "reply": {
+        "ok": true
+      },
+      "size_bytes": 328931
+    },
+    {
+      "index": 2,
+      "elapsed_sec": 0.9276231769763399,
+      "reply": {
+        "ok": true
+      },
+      "size_bytes": 304030
+    }
+  ]
+}
