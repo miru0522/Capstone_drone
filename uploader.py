@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import cv2
+import numpy as np
 import requests
 
 from ring_buffer import FrameEntry, FPS
@@ -369,12 +370,19 @@ def _run_per_event_worker(command, timeout_sec: float, output_path: str):
     return process
 
 
-def _run_persistent_worker(request: dict, response_path: str, deadline: float):
+def _run_persistent_worker(
+    request: dict,
+    response_path: str,
+    deadline: float,
+    *,
+    record_state: bool = True,
+):
     with _persistent_worker_lock:
         process = _get_persistent_worker()
-        _record_h264_state(
-            "started", pid=process.pid, output_path=request["output_partial"]
-        )
+        if record_state:
+            _record_h264_state(
+                "started", pid=process.pid, output_path=request["output_partial"]
+            )
         request = dict(request)
         request["response_path"] = response_path
         try:
@@ -412,7 +420,9 @@ def _run_persistent_worker(request: dict, response_path: str, deadline: float):
             time.sleep(0.01)
 
 
-def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
+def _encode_frames_h264(
+    frames: List[FrameEntry], fps: int, *, record_state: bool = True
+) -> str:
     """프레임을 raw BGR 파일로 넘겨 격리된 Jetson HW 인코더를 실행한다."""
     if not frames:
         raise ValueError("encode_frames_to_mp4: 빈 프레임 리스트")
@@ -485,7 +495,10 @@ def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
                 "bitrate": H264_BITRATE,
             }
             process = _run_persistent_worker(
-                request, response_path, time.monotonic() + remaining
+                request,
+                response_path,
+                time.monotonic() + remaining,
+                record_state=record_state,
             )
         logger.info(
             "h264_job_completed pid=%d mode=%s output=%s frames=%d payload_bytes=%d",
@@ -502,16 +515,18 @@ def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
             "size=%d bytes, elapsed=%.3fs",
             len(frames), fps, H264_BITRATE, os.path.getsize(final_path), elapsed,
         )
-        _record_h264_state("succeeded", elapsed_sec=elapsed)
+        if record_state:
+            _record_h264_state("succeeded", elapsed_sec=elapsed)
         result = final_path
         final_path = None
         return result
     except Exception as exc:
-        _record_h264_state(
-            "failed",
-            error=f"{type(exc).__name__}: {exc}",
-            elapsed_sec=time.monotonic() - started,
-        )
+        if record_state:
+            _record_h264_state(
+                "failed",
+                error=f"{type(exc).__name__}: {exc}",
+                elapsed_sec=time.monotonic() - started,
+            )
         raise
     finally:
         if (
@@ -537,6 +552,49 @@ def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
     if CLIP_ENCODER == "mp4v":
         return _encode_frames_mp4v(frames, fps)
     return _encode_frames_h264(frames, fps)
+
+
+def warmup_clip_encoder(width: int, height: int, fps: int = FPS) -> bool:
+    """첫 실제 트리거 전에 persistent H264 worker의 cold 비용을 지불한다.
+
+    웜업은 실제 이벤트가 아니므로 h264 state의 jobs/success/failure 통계를
+    변경하지 않는다. 실패해도 추론 기동을 막지 않고 첫 실제 요청에서
+    worker가 다시 시도하게 한다.
+    """
+    if CLIP_ENCODER != "h264":
+        return False
+    if H264_WORKER_MODE != "persistent":
+        logger.info("H264 웜업 생략: worker_mode=%s", H264_WORKER_MODE)
+        return False
+    if width <= 0 or height <= 0 or fps <= 0:
+        logger.warning(
+            "H264 웜업 생략: 잘못된 크기/fps width=%d height=%d fps=%d",
+            width,
+            height,
+            fps,
+        )
+        return False
+
+    started = time.monotonic()
+    output_path = None
+    dummy = np.zeros((height, width, 3), dtype=np.uint8)
+    frames = [
+        FrameEntry(frame=dummy, timestamp=0.0),
+        FrameEntry(frame=dummy, timestamp=1.0 / fps),
+    ]
+    try:
+        output_path = _encode_frames_h264(frames, fps, record_state=False)
+        logger.info(
+            "H264 웜업 완료: elapsed=%.3fs size=%d",
+            time.monotonic() - started,
+            os.path.getsize(output_path),
+        )
+        return True
+    except Exception:
+        logger.warning("H264 웜업 실패(추론은 계속 진행)", exc_info=True)
+        return False
+    finally:
+        _remove_quietly(output_path)
 
 
 def _post_with_retry(path: str, anomaly_score: Optional[float]) -> bool:
