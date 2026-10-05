@@ -53,6 +53,8 @@ fi
 
 export DEVICE_KEY="${DEVICE_KEY:-HPC-2026}"
 export UPLOAD_MODE="${UPLOAD_MODE:-B}"
+export CLIP_ENCODER="${CLIP_ENCODER:-h264}"
+export H264_BITRATE="${H264_BITRATE:-600000}"
 nohup python3 "$script_name" > "$log_file" 2>&1 &
 new_pid=$!
 printf '%s\n' "$new_pid" > "$pid_file"
