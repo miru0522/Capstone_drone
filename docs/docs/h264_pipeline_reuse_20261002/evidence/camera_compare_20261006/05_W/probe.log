@@ -1,0 +1,68 @@
+H264_PROBE_EVENT {"name": "camera_open_start", "wall_time": 1791263228.1708536, "monotonic": 515714.831071604}
+GST_ARGUS: Creating output stream
+CONSUMER: Waiting until producer is connected...
+GST_ARGUS: Available Sensor modes :
+GST_ARGUS: 3280 x 2464 FR = 21.000000 fps Duration = 47619048 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 3280 x 1848 FR = 28.000001 fps Duration = 35714284 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1920 x 1080 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1640 x 1232 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1280 x 720 FR = 59.999999 fps Duration = 16666667 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: Running with following settings:
+   Camera index = 0 
+   Camera mode  = 2 
+   Output Stream W = 1920 H = 1080 
+   seconds to Run    = 0 
+   Frame Rate = 29.999999 
+GST_ARGUS: Setup Complete, Starting captures for 0 seconds
+GST_ARGUS: Starting repeat capture requests.
+CONSUMER: Producer has connected; continuing.
+[ WARN:0] global ../modules/videoio/src/cap_gstreamer.cpp (935) open OpenCV | GStreamer warning: Cannot query video position: status=0, value=-1, duration=-1
+2026-10-06 14:07:10,053 [INFO] main: CSI 카메라 초기화 및 첫 프레임 확인 완료
+H264_PROBE_EVENT {"name": "camera_first_frame_ready", "wall_time": 1791263230.0555186, "monotonic": 515716.715737166}
+H264_PROBE_EVENT {"name": "vadclip_warmup_start", "wall_time": 1791263230.055756, "monotonic": 515716.715972567}
+2026-10-06 14:07:10,056 [INFO] anomaly_model_trt: VadCLIP 초기화 시작
+2026-10-06 14:07:23,855 [INFO] vadclip_adapter_trt: VadCLIP live temporal mapping: FPS=9, window=48 frames (5.333s), sample_indices=[0, 5, 10, 14, 19, 24, 29, 34, 38, 43]
+2026-10-06 14:07:54,818 [INFO] vadclip_adapter_trt: VadCLIP checkpoint strict load PASS (349 keys)
+[10/06/2026-14:08:09] [TRT] [W] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+2026-10-06 14:08:15,796 [INFO] vadclip_adapter_trt: TensorRT CLIP visual loaded: /home/hpc/edge_vadclip_2026/trt/clip_visual_vitb16_b1_10_fp16.engine, sha=973557212ba947da9f50eeb2e458cc5cd6e403f83858223f32f6e881071cfb69, profile min=(1, 3, 224, 224) opt=(10, 3, 224, 224) max=(10, 3, 224, 224), crop=5
+2026-10-06 14:08:15,797 [INFO] anomaly_model_trt: ✅ AnomalyPipeline(VadCLIP) 초기화 완료
+2026-10-06 14:08:15,797 [INFO] anomaly_model_trt: VadCLIP warmup 시작
+2026-10-06 14:08:25,358 [INFO] vadclip_adapter_trt: VadCLIP warmup PASS: score=0.001370, feature_buffer reset to 0
+2026-10-06 14:08:25,358 [INFO] anomaly_model_trt: VadCLIP warmup 완료: 9560.6ms
+H264_PROBE_EVENT {"name": "vadclip_warmup_end", "wall_time": 1791263305.358893, "monotonic": 515792.019110122}
+H264_PROBE_EVENT {"name": "h264_prepare_start", "wall_time": 1791263305.3590965, "monotonic": 515792.019312913, "condition": "W"}
+2026-10-06 14:08:25,623 [INFO] uploader: h264_persistent_worker_started pid=46654 log=/tmp/h264_preload_compare_20261006/evidence/05_W/h264_worker.log
+2026-10-06 14:08:28,520 [INFO] uploader: h264_job_completed pid=46654 mode=persistent output=/tmp/anomaly_clip_h264_afpkt__b.mp4.partial frames=2 payload_bytes=3110400
+2026-10-06 14:08:28,521 [INFO] uploader: h264(HW) 인코딩 완료: frames=2, fps=9, bitrate=600000, size=6037 bytes, elapsed=3.161s
+2026-10-06 14:08:28,523 [INFO] uploader: H264 웜업 완료: elapsed=3.164s size=6037
+H264_PROBE_EVENT {"name": "h264_prepare_end", "wall_time": 1791263308.5242949, "monotonic": 515795.184511648, "condition": "W", "ok": true}
+H264_PROBE_EVENT {"name": "capture_loop_start", "wall_time": 1791263308.524574, "monotonic": 515795.184790123}
+2026-10-06 14:08:28,526 [INFO] main: clip upload worker 시작
+2026-10-06 14:08:28,527 [INFO] main: VadCLIP 추론 worker 시작
+2026-10-06 14:08:28,528 [INFO] main: 캡처 루프 시작 (FPS=9, 버퍼=81프레임/9초, 추론주기=48프레임/5.33초)
+2026-10-06 14:08:29,530 [INFO] main: [진단] 최근 1.0초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-06 14:08:30,537 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-06 14:08:31,552 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-06 14:08:32,594 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-06 14:08:33,661 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-06 14:08:35,036 [INFO] main: [진단] 최근 1.4초간 처리프레임=1(목표 9), 밀린시간누적=1175ms
+H264_PROBE_EVENT {"name": "first_inference_start", "wall_time": 1791263315.0381358, "monotonic": 515801.698353399, "frame_count": 48}
+NvMapMemAllocInternalTagged: 1074810371 error 12
+NvMapMemHandleAlloc: error 0
+NvMapMemAllocInternalTagged: 1074810371 error 12
+NvMapMemHandleAlloc: error 0
+2026-10-06 14:08:36,046 [INFO] main: [진단] 최근 1.0초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-06 14:08:36,430 [ERROR] main: 모델 추론 실패 (1회 연속): cuDNN error: CUDNN_STATUS_NOT_INITIALIZED
+H264_PROBE_EVENT {"name": "first_inference_end", "wall_time": 1791263316.4489913, "monotonic": 515803.10921023, "score": 0.0}
+H264_PROBE_EVENT {"name": "score_observed_trigger_blocked", "wall_time": 1791263316.449379, "monotonic": 515803.109595749, "score": 0.0}
+2026-10-06 14:08:36,845 [INFO] main: CSI 카메라 해제 완료
+H264_PROBE_EVENT {"name": "capture_loop_end", "wall_time": 1791263316.8949459, "monotonic": 515803.555164756}
+2026-10-06 14:08:36,895 [INFO] main: CSI 카메라 해제 완료
+GST_ARGUS: Cleaning up
+CONSUMER: Done Success
+GST_ARGUS: Done Success

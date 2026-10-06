@@ -1,0 +1,69 @@
+{
+  "condition": "W",
+  "status": "PASS",
+  "pid": 45065,
+  "events": [
+    {
+      "name": "camera_open_start",
+      "wall_time": 1791261956.090173,
+      "monotonic": 514442.75039149
+    },
+    {
+      "name": "camera_first_frame_ready",
+      "wall_time": 1791261957.6344469,
+      "monotonic": 514444.294665211
+    },
+    {
+      "name": "vadclip_warmup_start",
+      "wall_time": 1791261957.6346383,
+      "monotonic": 514444.29485463
+    },
+    {
+      "name": "vadclip_warmup_end",
+      "wall_time": 1791262046.6945221,
+      "monotonic": 514533.354740445
+    },
+    {
+      "name": "h264_prepare_start",
+      "wall_time": 1791262046.6949332,
+      "monotonic": 514533.355149556,
+      "condition": "W"
+    },
+    {
+      "name": "h264_prepare_end",
+      "wall_time": 1791262050.0121925,
+      "monotonic": 514536.672408875,
+      "condition": "W",
+      "ok": true
+    },
+    {
+      "name": "capture_loop_start",
+      "wall_time": 1791262050.012536,
+      "monotonic": 514536.672752318
+    },
+    {
+      "name": "first_inference_start",
+      "wall_time": 1791262056.7700737,
+      "monotonic": 514543.430291516,
+      "frame_count": 48
+    },
+    {
+      "name": "first_inference_end",
+      "wall_time": 1791262057.9245348,
+      "monotonic": 514544.584752481,
+      "score": 0.20058974623680115
+    },
+    {
+      "name": "score_observed_trigger_blocked",
+      "wall_time": 1791262057.924776,
+      "monotonic": 514544.584992366,
+      "score": 0.20058974623680115
+    },
+    {
+      "name": "capture_loop_end",
+      "wall_time": 1791262058.3800063,
+      "monotonic": 514545.040224646
+    }
+  ],
+  "completed_at": 1791262058.3976884
+}

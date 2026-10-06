@@ -1,0 +1,15 @@
+{
+  "condition": "W",
+  "sequence": 4,
+  "started_at": 1791262904.511341,
+  "completed_at": 1791263009.9045768,
+  "elapsed_sec": 105.39323687553406,
+  "probe_pid": 46243,
+  "returncode": 0,
+  "timed_out": false,
+  "sigterm_timed_out": false,
+  "processes_before": [],
+  "processes_after": [],
+  "probe_status": "PASS",
+  "probe_result_present": true
+}

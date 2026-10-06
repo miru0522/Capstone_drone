@@ -1,0 +1,15 @@
+{
+  "condition": "C",
+  "sequence": 2,
+  "started_at": 1791262242.795527,
+  "completed_at": 1791262344.7406743,
+  "elapsed_sec": 101.945148229599,
+  "probe_pid": 45577,
+  "returncode": 0,
+  "timed_out": false,
+  "sigterm_timed_out": false,
+  "processes_before": [],
+  "processes_after": [],
+  "probe_status": "PASS",
+  "probe_result_present": true
+}

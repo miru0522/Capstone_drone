@@ -1,0 +1,61 @@
+H264_PROBE_EVENT {"name": "camera_open_start", "wall_time": 1791263778.772904, "monotonic": 516265.433122702}
+GST_ARGUS: Creating output stream
+CONSUMER: Waiting until producer is connected...
+GST_ARGUS: Available Sensor modes :
+GST_ARGUS: 3280 x 2464 FR = 21.000000 fps Duration = 47619048 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 3280 x 1848 FR = 28.000001 fps Duration = 35714284 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1920 x 1080 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1640 x 1232 FR = 29.999999 fps Duration = 33333334 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: 1280 x 720 FR = 59.999999 fps Duration = 16666667 ; Analog Gain range min 1.000000, max 10.625000; Exposure Range min 13000, max 683709000;
+
+GST_ARGUS: Running with following settings:
+   Camera index = 0 
+   Camera mode  = 2 
+   Output Stream W = 1920 H = 1080 
+   seconds to Run    = 0 
+   Frame Rate = 29.999999 
+GST_ARGUS: Setup Complete, Starting captures for 0 seconds
+GST_ARGUS: Starting repeat capture requests.
+CONSUMER: Producer has connected; continuing.
+[ WARN:0] global ../modules/videoio/src/cap_gstreamer.cpp (935) open OpenCV | GStreamer warning: Cannot query video position: status=0, value=-1, duration=-1
+2026-10-06 14:16:20,252 [INFO] main: CSI 카메라 초기화 및 첫 프레임 확인 완료
+H264_PROBE_EVENT {"name": "camera_first_frame_ready", "wall_time": 1791263780.2538311, "monotonic": 516266.914049606}
+H264_PROBE_EVENT {"name": "vadclip_warmup_start", "wall_time": 1791263780.2540798, "monotonic": 516266.914296111}
+2026-10-06 14:16:20,254 [INFO] anomaly_model_trt: VadCLIP 초기화 시작
+2026-10-06 14:16:34,706 [INFO] vadclip_adapter_trt: VadCLIP live temporal mapping: FPS=9, window=48 frames (5.333s), sample_indices=[0, 5, 10, 14, 19, 24, 29, 34, 38, 43]
+2026-10-06 14:17:00,353 [INFO] vadclip_adapter_trt: VadCLIP checkpoint strict load PASS (349 keys)
+[10/06/2026-14:17:16] [TRT] [W] Using an engine plan file across different models of devices is not recommended and is likely to affect performance or even cause errors.
+2026-10-06 14:17:22,997 [INFO] vadclip_adapter_trt: TensorRT CLIP visual loaded: /home/hpc/edge_vadclip_2026/trt/clip_visual_vitb16_b1_10_fp16.engine, sha=973557212ba947da9f50eeb2e458cc5cd6e403f83858223f32f6e881071cfb69, profile min=(1, 3, 224, 224) opt=(10, 3, 224, 224) max=(10, 3, 224, 224), crop=5
+2026-10-06 14:17:22,998 [INFO] anomaly_model_trt: ✅ AnomalyPipeline(VadCLIP) 초기화 완료
+2026-10-06 14:17:22,998 [INFO] anomaly_model_trt: VadCLIP warmup 시작
+2026-10-06 14:17:33,709 [INFO] vadclip_adapter_trt: VadCLIP warmup PASS: score=0.001370, feature_buffer reset to 0
+2026-10-06 14:17:33,709 [INFO] anomaly_model_trt: VadCLIP warmup 완료: 10711.2ms
+H264_PROBE_EVENT {"name": "vadclip_warmup_end", "wall_time": 1791263853.7101738, "monotonic": 516340.370391701}
+H264_PROBE_EVENT {"name": "h264_prepare_start", "wall_time": 1791263853.7103481, "monotonic": 516340.370564059, "condition": "C"}
+2026-10-06 14:17:33,958 [INFO] uploader: h264_persistent_worker_started pid=47076 log=/tmp/h264_preload_compare_20261006/evidence/06_C/h264_worker.log
+2026-10-06 14:17:35,454 [INFO] uploader: H264 worker/GStreamer 준비 완료: pid=47076 elapsed=1.744s (NVENC 미할당)
+H264_PROBE_EVENT {"name": "h264_prepare_end", "wall_time": 1791263855.4550498, "monotonic": 516342.115266285, "condition": "C", "ok": true}
+H264_PROBE_EVENT {"name": "capture_loop_start", "wall_time": 1791263855.4553545, "monotonic": 516342.115570521}
+2026-10-06 14:17:35,457 [INFO] main: clip upload worker 시작
+2026-10-06 14:17:35,458 [INFO] main: VadCLIP 추론 worker 시작
+2026-10-06 14:17:35,459 [INFO] main: 캡처 루프 시작 (FPS=9, 버퍼=81프레임/9초, 추론주기=48프레임/5.33초)
+2026-10-06 14:17:36,468 [INFO] main: [진단] 최근 1.0초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-06 14:17:37,488 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-06 14:17:38,592 [INFO] main: [진단] 최근 1.1초간 처리프레임=10(목표 9), 밀린시간누적=0ms
+2026-10-06 14:17:39,596 [INFO] main: [진단] 최근 1.0초간 처리프레임=9(목표 9), 밀린시간누적=0ms
+2026-10-06 14:17:41,906 [INFO] main: [진단] 최근 2.3초간 처리프레임=10(목표 9), 밀린시간누적=1114ms
+H264_PROBE_EVENT {"name": "first_inference_start", "wall_time": 1791263861.908579, "monotonic": 516348.568797937, "frame_count": 48}
+2026-10-06 14:17:42,919 [INFO] main: [진단] 최근 1.0초간 처리프레임=8(목표 9), 밀린시간누적=209ms
+2026-10-06 14:17:43,104 [INFO] anomaly_model_trt: [진단] VadCLIP 추론 total=1194.4ms, feature_buffer=10/256, score=0.181990
+H264_PROBE_EVENT {"name": "first_inference_end", "wall_time": 1791263863.1048045, "monotonic": 516349.765022644, "score": 0.18199048936367035}
+H264_PROBE_EVENT {"name": "score_observed_trigger_blocked", "wall_time": 1791263863.1051311, "monotonic": 516349.765347904, "score": 0.18199048936367035}
+2026-10-06 14:17:43,488 [INFO] main: CSI 카메라 해제 완료
+H264_PROBE_EVENT {"name": "capture_loop_end", "wall_time": 1791263863.5302153, "monotonic": 516350.190433981}
+2026-10-06 14:17:43,631 [INFO] main: CSI 카메라 해제 완료
+GST_ARGUS: Cleaning up
+CONSUMER: Done Success
+GST_ARGUS: Done Success
