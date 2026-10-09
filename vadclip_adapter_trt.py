@@ -476,10 +476,23 @@ class VadCLIPScorer:
     def warmup(self) -> float:
         """Warm CUDA/CLIP/VadCLIP once without contaminating live history."""
         dummy = np.zeros((INFER_WINDOW_LEN, 224, 224, 3), dtype=np.uint8)
-        score = self.compute_score(dummy)
-        self.feature_buffer.clear()
+        try:
+            score = self.compute_score(dummy)
+        finally:
+            # compute_score가 중간에 예외를 내도 partial feature가 history에
+            # 남을 수 있으므로 성공/실패 모두 정리한다(기동 건강성 검사 추가로
+            # 2026-10-07 발견).
+            self.feature_buffer.clear()
         logger.info("VadCLIP warmup PASS: score=%.6f, feature_buffer reset to 0", score)
         return score
+
+    def reset_history(self) -> None:
+        """운영 추론 기록을 오염시키지 않도록 rolling feature buffer를 비운다.
+
+        기동 건강성 검사가 compute_score()를 직접 호출한 뒤 성공/실패와
+        무관하게 호출해야 한다.
+        """
+        self.feature_buffer.clear()
 
     def _validate_paths(self) -> None:
         required = {

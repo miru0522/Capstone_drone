@@ -58,3 +58,8 @@ class AnomalyPipeline:
             score,
         )
         return score
+
+    def reset_history(self) -> None:
+        """rolling feature buffer를 비운다. 기동 건강성 검사 전용 — 운영
+        detect_anomaly() 경로는 호출하지 않는다."""
+        self.scorer.reset_history()
