@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import cv2
+import numpy as np
 import requests
 
 from ring_buffer import FrameEntry, FPS
@@ -92,7 +93,56 @@ if H264_WORKER_MODE not in ("per_event", "persistent"):
 
 _persistent_worker = None
 _persistent_worker_path = None
-_persistent_worker_lock = threading.Lock()
+# RLock: activate_mp4v_fallback()의 확인형 종료 경로가 같은 스레드에서
+# 다시 잠글 가능성에 대비한 방어적 선택(기존 호출부는 원래도 중첩 호출이
+# 없었지만, Codex 검수가 재진입 안전성을 명시적으로 요구함).
+_persistent_worker_lock = threading.RLock()
+
+# ─── 활성 인코더(런타임 폴백용) ──────────────────────────────────
+# CLIP_ENCODER는 import 시 고정되는 "설정값"이다. 기동 건강성 검사가 H264를
+# 포기해야 할 때는 이 설정값을 바꾸는 게 아니라 별도의 "활성값"만 바꾼다.
+# main.py 등 호출자는 반드시 get_active_clip_encoder()로 조회해야 하며,
+# import 시 복사해둔 CLIP_ENCODER를 직접 분기에 쓰면 안 된다(2026-10-07
+# 기동 건강성 검사 추가로 명시).
+_active_encoder = CLIP_ENCODER
+_active_encoder_lock = threading.Lock()
+
+
+def get_active_clip_encoder() -> str:
+    """현재 실제로 사용 중인 인코더. 기동 폴백 전까지는 CLIP_ENCODER와 같다."""
+    with _active_encoder_lock:
+        return _active_encoder
+
+
+def activate_mp4v_fallback(reason: str) -> bool:
+    """H264를 포기하고 mp4v로 전환한다. 운영 루프 시작 "전"에만 호출해야 한다.
+
+    같은 이벤트를 H264 실패 후 mp4v로 재인코딩하지 않는 기존 금지 규칙과는
+    무관하다 — 이건 이벤트 단위가 아니라 기동 시 1회만 내려지는 전역 결정이다.
+    이미 mp4v면 아무 것도 하지 않고 False를 반환한다(중복 전환 방지).
+
+    실제 worker 종료가 확인돼야만 active encoder를 바꾼다(2026-10-07 Codex
+    검수로 발견: 기존에는 stop 호출 여부만 보고 종료를 확신했다). 종료를
+    확인할 수 없으면 mp4v로 전환하지 않고 RuntimeError를 낸다 — 호출부
+    (startup_health.py)가 이걸 기동 실패로 처리해야 한다.
+    """
+    global _active_encoder
+    with _active_encoder_lock:
+        if _active_encoder == "mp4v":
+            return False
+
+    if not _stop_persistent_worker_confirmed():
+        raise RuntimeError(
+            "H264 persistent worker 종료를 확인할 수 없어 mp4v로 전환하지 않음"
+        )
+
+    with _active_encoder_lock:
+        _active_encoder = "mp4v"
+    logger.warning(
+        "clip_encoder_fallback configured=%s active=mp4v reason=%s",
+        CLIP_ENCODER, reason,
+    )
+    return True
 
 
 def _build_form_data(anomaly_score: Optional[float]) -> dict:
@@ -158,10 +208,15 @@ def _remove_quietly(path: Optional[str]) -> None:
         pass
 
 
-def _terminate_process_group(process: subprocess.Popen) -> None:
-    """멈춘 GStreamer 네이티브 호출을 부모 프로세스에서 격리 종료한다."""
+def _terminate_process_group(process: subprocess.Popen) -> bool:
+    """멈춘 GStreamer 네이티브 호출을 부모 프로세스에서 격리 종료한다.
+
+    반환값: 실제 종료가 확인됐는지(True) 여부. SIGKILL 이후에도 확인되지
+    않으면 False — 호출부가 "죽었다고 가정"하지 않게 한다(2026-10-07 Codex
+    검수로 발견: 기존에는 반환값이 없어 호출부가 항상 성공으로 가정했다).
+    """
     if process.poll() is not None:
-        return
+        return True
 
     try:
         if os.name == "posix":
@@ -169,7 +224,7 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
         else:
             process.terminate()
         process.wait(timeout=2)
-        return
+        return True
     except (OSError, subprocess.TimeoutExpired):
         pass
 
@@ -179,8 +234,10 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
         else:
             process.kill()
         process.wait(timeout=2)
+        return True
     except (OSError, subprocess.TimeoutExpired):
         logger.error("H264 인코더 프로세스 강제 종료 확인 실패: pid=%s", process.pid)
+        return False
 
 
 def _read_worker_log_tail() -> str:
@@ -195,12 +252,38 @@ def _read_worker_log_tail() -> str:
 
 
 def _stop_persistent_worker() -> None:
+    """기존 호출부(atexit, 에러 복구 경로) 호환용 - 항상 전역 참조를
+    지우는 최선형 정리다. 종료를 확신해야 하는 호출부는
+    _stop_persistent_worker_confirmed()를 써라."""
     global _persistent_worker, _persistent_worker_path
     process = _persistent_worker
     _persistent_worker = None
     _persistent_worker_path = None
     if process is not None and process.poll() is None:
         _terminate_process_group(process)
+
+
+def _stop_persistent_worker_confirmed() -> bool:
+    """실제 종료가 확인된 경우에만 전역 참조를 지운다.
+
+    activate_mp4v_fallback()처럼 "정말 죽었는지" 확신해야 하는 호출부
+    전용이다. 종료 확인에 실패하면 참조를 그대로 둬 고아를 만들지 않고,
+    다음 호출이 같은 프로세스 상태를 다시 볼 수 있게 한다.
+    """
+    global _persistent_worker, _persistent_worker_path
+    with _persistent_worker_lock:
+        process = _persistent_worker
+        if process is None:
+            return True
+        if process.poll() is not None:
+            _persistent_worker = None
+            _persistent_worker_path = None
+            return True
+        confirmed = _terminate_process_group(process)
+        if confirmed:
+            _persistent_worker = None
+            _persistent_worker_path = None
+        return confirmed
 
 
 def _get_persistent_worker() -> subprocess.Popen:
@@ -369,12 +452,19 @@ def _run_per_event_worker(command, timeout_sec: float, output_path: str):
     return process
 
 
-def _run_persistent_worker(request: dict, response_path: str, deadline: float):
+def _run_persistent_worker(
+    request: dict,
+    response_path: str,
+    deadline: float,
+    *,
+    record_state: bool = True,
+):
     with _persistent_worker_lock:
         process = _get_persistent_worker()
-        _record_h264_state(
-            "started", pid=process.pid, output_path=request["output_partial"]
-        )
+        if record_state:
+            _record_h264_state(
+                "started", pid=process.pid, output_path=request["output_partial"]
+            )
         request = dict(request)
         request["response_path"] = response_path
         try:
@@ -412,7 +502,9 @@ def _run_persistent_worker(request: dict, response_path: str, deadline: float):
             time.sleep(0.01)
 
 
-def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
+def _encode_frames_h264(
+    frames: List[FrameEntry], fps: int, *, record_state: bool = True
+) -> str:
     """프레임을 raw BGR 파일로 넘겨 격리된 Jetson HW 인코더를 실행한다."""
     if not frames:
         raise ValueError("encode_frames_to_mp4: 빈 프레임 리스트")
@@ -485,7 +577,10 @@ def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
                 "bitrate": H264_BITRATE,
             }
             process = _run_persistent_worker(
-                request, response_path, time.monotonic() + remaining
+                request,
+                response_path,
+                time.monotonic() + remaining,
+                record_state=record_state,
             )
         logger.info(
             "h264_job_completed pid=%d mode=%s output=%s frames=%d payload_bytes=%d",
@@ -502,16 +597,18 @@ def _encode_frames_h264(frames: List[FrameEntry], fps: int) -> str:
             "size=%d bytes, elapsed=%.3fs",
             len(frames), fps, H264_BITRATE, os.path.getsize(final_path), elapsed,
         )
-        _record_h264_state("succeeded", elapsed_sec=elapsed)
+        if record_state:
+            _record_h264_state("succeeded", elapsed_sec=elapsed)
         result = final_path
         final_path = None
         return result
     except Exception as exc:
-        _record_h264_state(
-            "failed",
-            error=f"{type(exc).__name__}: {exc}",
-            elapsed_sec=time.monotonic() - started,
-        )
+        if record_state:
+            _record_h264_state(
+                "failed",
+                error=f"{type(exc).__name__}: {exc}",
+                elapsed_sec=time.monotonic() - started,
+            )
         raise
     finally:
         if (
@@ -533,10 +630,57 @@ def encode_frames_to_mp4(frames: List[FrameEntry], fps: int = FPS) -> str:
     CLIP_ENCODER=mp4v: 기존 OpenCV 경로
     CLIP_ENCODER=h264: 별도 프로세스의 nvv4l2h264enc 경로
     호출자가 반환된 임시파일을 삭제할 책임이 있다.
+
+    CLIP_ENCODER(설정값)가 아니라 get_active_clip_encoder()(활성값)로
+    분기한다 — 기동 건강성 검사가 mp4v로 폴백했다면 설정은 여전히 h264라도
+    실제 인코딩은 mp4v로 가야 한다.
     """
-    if CLIP_ENCODER == "mp4v":
+    if get_active_clip_encoder() == "mp4v":
         return _encode_frames_mp4v(frames, fps)
     return _encode_frames_h264(frames, fps)
+
+
+def warmup_clip_encoder(width: int, height: int, fps: int = FPS) -> bool:
+    """첫 실제 트리거 전에 persistent H264 worker의 cold 비용을 지불한다.
+
+    웜업은 실제 이벤트가 아니므로 h264 state의 jobs/success/failure 통계를
+    변경하지 않는다. 실패해도 추론 기동을 막지 않고 첫 실제 요청에서
+    worker가 다시 시도하게 한다.
+    """
+    if get_active_clip_encoder() != "h264":
+        return False
+    if H264_WORKER_MODE != "persistent":
+        logger.info("H264 웜업 생략: worker_mode=%s", H264_WORKER_MODE)
+        return False
+    if width <= 0 or height <= 0 or fps <= 0:
+        logger.warning(
+            "H264 웜업 생략: 잘못된 크기/fps width=%d height=%d fps=%d",
+            width,
+            height,
+            fps,
+        )
+        return False
+
+    started = time.monotonic()
+    output_path = None
+    dummy = np.zeros((height, width, 3), dtype=np.uint8)
+    frames = [
+        FrameEntry(frame=dummy, timestamp=0.0),
+        FrameEntry(frame=dummy, timestamp=1.0 / fps),
+    ]
+    try:
+        output_path = _encode_frames_h264(frames, fps, record_state=False)
+        logger.info(
+            "H264 웜업 완료: elapsed=%.3fs size=%d",
+            time.monotonic() - started,
+            os.path.getsize(output_path),
+        )
+        return True
+    except Exception:
+        logger.warning("H264 웜업 실패(추론은 계속 진행)", exc_info=True)
+        return False
+    finally:
+        _remove_quietly(output_path)
 
 
 def _post_with_retry(path: str, anomaly_score: Optional[float]) -> bool:

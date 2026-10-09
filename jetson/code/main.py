@@ -18,10 +18,13 @@ import os
 import time
 import logging
 import signal
+import subprocess
 import sys
+import tempfile
 import threading
 import queue
 import uuid
+from datetime import datetime
 from typing import Optional
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -29,8 +32,18 @@ import cv2
 import numpy as np
 import requests
 from ring_buffer import RingBuffer, FrameEntry, FPS, BUFFER_MAXLEN, INFER_WINDOW_LEN
-from uploader import ANALYZE_URL, CLIP_ENCODER, DRONE_ID, UPLOAD_MODE, upload_clip_sync
+import uploader as uploader_module
+from uploader import (
+    ANALYZE_URL,
+    CLIP_ENCODER,
+    DRONE_ID,
+    UPLOAD_MODE,
+    upload_clip_sync,
+    warmup_clip_encoder,
+    get_active_clip_encoder,
+)
 from anomaly_model_trt import AnomalyPipeline
+from startup_health import run_startup_health_gate
 from state_store import atomic_write_json, read_json, update_json
 
 logging.basicConfig(
@@ -115,6 +128,21 @@ SERVER_HOST = os.environ.get("SERVER_URL", "http://203.249.90.3:8031")
 DEVICE_KEY = os.environ.get("DEVICE_KEY", "HPC-2026")
 STREAM_FRAME_TIMEOUT_SEC = 5.0     # 프레임 1장 업로드 타임아웃
 STREAM_NO_RESPONSE_LIMIT_SEC = 10.0  # 이 시간 무응답이면 자체 중지 (서버 확정 스펙)
+
+# main.py가 소유한 9초 링버퍼를 재사용하는 로컬 녹화 요청 채널.
+# 별도 프로세스가 CSI 카메라를 다시 열지 않고, 인코딩만 격리 프로세스에서 한다.
+PERIODIC_RECORD_STATE_PATH = os.environ.get(
+    "PERIODIC_RECORD_STATE_PATH", "/tmp/drone_periodic_record.json"
+)
+PERIODIC_RECORD_OUTPUT_DIR = os.environ.get(
+    "PERIODIC_RECORD_OUTPUT_DIR", "/home/hpc/drone_2026/video/xaviernx"
+)
+PERIODIC_RECORD_INTERVAL_SEC = 8.0
+PERIODIC_RECORD_MAX_DURATION_SEC = 60.0
+PERIODIC_RECORD_WIDTH = 960
+PERIODIC_RECORD_HEIGHT = 540
+PERIODIC_RECORD_BITRATE = 4_000_000
+PERIODIC_RECORD_TIMEOUT_SEC = 7.0
 
 
 def create_gstreamer_pipeline(width=CAMERA_WIDTH, height=CAMERA_HEIGHT, fps=FPS) -> str:
@@ -681,6 +709,238 @@ class TestVideoInjector:
         return True, frame
 
 
+class PeriodicRingRecorder:
+    """60초 요청 동안 9초 링버퍼를 8초 간격으로 로컬 MP4로 저장한다."""
+
+    def __init__(self, ring_buffer: RingBuffer):
+        self.ring_buffer = ring_buffer
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+        self._last_request_id: Optional[str] = None
+        self._worker_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "periodic_h264_encoder.py",
+        )
+
+    def start(self) -> None:
+        self._running = True
+        self._thread = threading.Thread(
+            target=self._loop,
+            name="periodic-ring-recorder",
+            daemon=True,
+        )
+        self._thread.start()
+        logger.info(
+            "[로컬녹화] 요청 감시 시작 (state=%s, output=%s)",
+            PERIODIC_RECORD_STATE_PATH,
+            PERIODIC_RECORD_OUTPUT_DIR,
+        )
+
+    def stop(self) -> None:
+        self._running = False
+
+    def _update_request(self, request_id: str, **fields) -> None:
+        def update_if_current(current):
+            if not isinstance(current, dict) or current.get("request_id") != request_id:
+                return None
+            updated = dict(current)
+            updated.update(fields)
+            updated["updated_at"] = time.time()
+            return updated
+
+        update_json(PERIODIC_RECORD_STATE_PATH, update_if_current, default={})
+
+    def _read_request(self):
+        request = read_json(PERIODIC_RECORD_STATE_PATH, None)
+        if not isinstance(request, dict) or request.get("status") != "requested":
+            return None
+
+        request_id = str(request.get("request_id") or "")
+        if not request_id or request_id == self._last_request_id:
+            return None
+
+        try:
+            requested_at = float(request["requested_at"])
+            duration_sec = float(request.get("duration_sec", 60.0))
+        except (KeyError, TypeError, ValueError):
+            self._last_request_id = request_id
+            self._update_request(request_id, status="rejected", error="invalid request")
+            return None
+
+        now = time.time()
+        if not np.isfinite(requested_at) or now - requested_at > 30.0:
+            self._last_request_id = request_id
+            self._update_request(request_id, status="expired")
+            return None
+        if not np.isfinite(duration_sec) or not 1.0 <= duration_sec <= PERIODIC_RECORD_MAX_DURATION_SEC:
+            self._last_request_id = request_id
+            self._update_request(request_id, status="rejected", error="duration out of range")
+            return None
+
+        self._last_request_id = request_id
+        return request_id, duration_sec
+
+    def _encode_snapshot(self, request_id: str, sequence: int):
+        entries = self.ring_buffer.get_full_buffer()
+        if len(entries) < BUFFER_MAXLEN:
+            logger.warning(
+                "[로컬녹화] 링버퍼 미충전으로 %d번 클립 생략 (%d/%d)",
+                sequence,
+                len(entries),
+                BUFFER_MAXLEN,
+            )
+            return None
+
+        os.makedirs(PERIODIC_RECORD_OUTPUT_DIR, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+        final_path = os.path.join(
+            PERIODIC_RECORD_OUTPUT_DIR,
+            f"xaviernx_{stamp}_{sequence:02d}.mp4",
+        )
+        partial_path = final_path + ".partial"
+        raw_fd, raw_path = tempfile.mkstemp(
+            prefix="xaviernx-ring-",
+            suffix=".bgr",
+            dir="/dev/shm",
+        )
+
+        try:
+            with os.fdopen(raw_fd, "wb") as raw_file:
+                entries.reverse()
+                while entries:
+                    entry = entries.pop()
+                    resized = cv2.resize(
+                        entry.frame,
+                        (PERIODIC_RECORD_WIDTH, PERIODIC_RECORD_HEIGHT),
+                        interpolation=cv2.INTER_AREA,
+                    )
+                    raw_file.write(np.ascontiguousarray(resized).tobytes())
+
+            command = [
+                sys.executable,
+                self._worker_path,
+                "--input-raw", raw_path,
+                "--output-partial", partial_path,
+                "--width", str(PERIODIC_RECORD_WIDTH),
+                "--height", str(PERIODIC_RECORD_HEIGHT),
+                "--frames", str(BUFFER_MAXLEN),
+                "--fps", str(FPS),
+                "--bitrate", str(PERIODIC_RECORD_BITRATE),
+            ]
+            completed = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=PERIODIC_RECORD_TIMEOUT_SEC,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    f"encoder rc={completed.returncode}: {completed.stderr.strip()}"
+                )
+            if not os.path.exists(partial_path) or os.path.getsize(partial_path) <= 0:
+                raise RuntimeError("인코더 결과 파일이 비어 있음")
+            os.replace(partial_path, final_path)
+            logger.info("[로컬녹화] %d번 클립 저장 완료: %s", sequence, final_path)
+            return final_path
+        except subprocess.TimeoutExpired:
+            logger.exception(
+                "[로컬녹화] %d번 클립 인코딩 %.1f초 초과",
+                sequence,
+                PERIODIC_RECORD_TIMEOUT_SEC,
+            )
+            return None
+        except Exception:
+            logger.exception("[로컬녹화] %d번 클립 저장 실패", sequence)
+            return None
+        finally:
+            for temp_path in (raw_path, partial_path):
+                try:
+                    os.remove(temp_path)
+                except FileNotFoundError:
+                    pass
+                except OSError:
+                    logger.warning("[로컬녹화] 임시 파일 정리 실패: %s", temp_path)
+
+    def _record(self, request_id: str, duration_sec: float) -> None:
+        started_at = time.time()
+        end_at = started_at + duration_sec
+        first_delay = BUFFER_MAXLEN / FPS
+        next_due = started_at + first_delay
+        sequence = 0
+        saved_files = []
+        self._update_request(
+            request_id,
+            status="active",
+            started_at=started_at,
+            end_at=end_at,
+            output_dir=PERIODIC_RECORD_OUTPUT_DIR,
+            width=PERIODIC_RECORD_WIDTH,
+            height=PERIODIC_RECORD_HEIGHT,
+            fps=FPS,
+            interval_sec=PERIODIC_RECORD_INTERVAL_SEC,
+        )
+        logger.warning(
+            "[로컬녹화] %.0f초 녹화 시작; 첫 9초 완성 후 8초 간격 스냅샷",
+            duration_sec,
+        )
+
+        while self._running and time.time() < end_at:
+            now = time.time()
+            if now < next_due:
+                time.sleep(min(0.2, next_due - now, end_at - now))
+                continue
+
+            sequence += 1
+            saved = self._encode_snapshot(request_id, sequence)
+            if saved:
+                saved_files.append(saved)
+                self._update_request(
+                    request_id,
+                    saved_count=len(saved_files),
+                    last_file=saved,
+                )
+            next_due += PERIODIC_RECORD_INTERVAL_SEC
+            while next_due <= time.time():
+                next_due += PERIODIC_RECORD_INTERVAL_SEC
+
+        # 57초 스냅샷 후 남은 마지막 3초도 포함하도록 60초 시점에 한 번 더 저장.
+        if self._running:
+            sequence += 1
+            saved = self._encode_snapshot(request_id, sequence)
+            if saved:
+                saved_files.append(saved)
+
+        if not self._running:
+            status = "stopped"
+        elif saved_files:
+            status = "completed"
+        else:
+            status = "failed"
+        self._update_request(
+            request_id,
+            status=status,
+            completed_at=time.time(),
+            saved_count=len(saved_files),
+            saved_files=saved_files,
+        )
+        logger.warning(
+            "[로컬녹화] 종료 status=%s, 저장=%d개",
+            status,
+            len(saved_files),
+        )
+
+    def _loop(self) -> None:
+        while self._running:
+            request = self._read_request()
+            if request is None:
+                time.sleep(0.5)
+                continue
+            request_id, duration_sec = request
+            self._record(request_id, duration_sec)
+
+
 class CameraAnomalyPipeline:
     def __init__(self, hover_controller: DroneHoverController):
         self.buffer = RingBuffer(maxlen=BUFFER_MAXLEN)
@@ -690,6 +950,7 @@ class CameraAnomalyPipeline:
         self._last_trigger_time = 0.0
         self.hover = hover_controller
         self.latest_frame_for_stream = None  # MJPEGStreamServer가 읽어가는 최신 프레임
+        self._periodic_recorder = PeriodicRingRecorder(self.buffer)
 
         # VadCLIP 추론은 캡처 루프와 분리한다.
         # queue는 1개만 유지하며, 밀릴 경우 오래된 대기 window를 버리고 최신 window로 교체한다.
@@ -704,11 +965,27 @@ class CameraAnomalyPipeline:
         self._upload_thread: Optional[threading.Thread] = None
         self._upload_busy = threading.Event()
 
+        # 2026-10-07 Codex 검수로 수정: 건강성 gate가 끝나기 전에는 어떤
+        # 보조 서비스도 시작하지 않는다(설계 문서 요구사항). 생성자는
+        # 객체만 준비하고, 실제 시작은 run()에서 start_auxiliary_services()
+        # 호출로 한 번만 수행한다 — gate가 실패/timeout이면 호출 자체가
+        # 없어 시작 횟수가 0이 된다.
+        self._stream_server = None
+        self._stream_uploader = None
+        self._aux_services_started = False
+
+    def start_auxiliary_services(self) -> None:
+        """건강성 gate가 pipeline_run을 허용한 뒤 run()에서만 호출한다.
+
+        idempotent: 이미 시작했으면 아무 것도 하지 않는다.
+        """
+        if self._aux_services_started:
+            return
+        self._aux_services_started = True
+
         if STREAM_ENABLED:
             self._stream_server = MJPEGStreamServer(self, STREAM_PORT)
             self._stream_server.start()
-        else:
-            self._stream_server = None
 
         # ★2026-08-21 서버확정: 실제 관제 스트리밍은 HTTP 업로드로 수행.
         # MJPEGStreamServer(위, Tailscale 직결 로컬용)와는 별개.
@@ -740,6 +1017,44 @@ class CameraAnomalyPipeline:
         if self.cap is not None:
             self.cap.release()
             logger.info("CSI 카메라 해제 완료")
+
+    def collect_healthcheck_window(self, window_len: int = INFER_WINDOW_LEN) -> np.ndarray:
+        """기동 건강성 검사 전용: 새 CSI 프레임 window_len장을 직접 읽어
+        (T,H,W,C) BGR uint8 배열로 반환한다.
+
+        ring buffer, upload queue, threshold, hover, 주기녹화, 스트리밍
+        경로에는 어디에도 넣지 않는다 - 이 프레임은 검사용이며 운영
+        기록에 남지 않는다.
+
+        리스트에 48장을 모았다가 np.stack()으로 다시 복사하면 1080p 기준
+        약 285MiB짜리 배열이 순간적으로 두 벌 공존한다(2026-10-07 Codex
+        검수로 발견). 첫 프레임으로 shape/dtype을 확인한 뒤 최종 배열을
+        한 번만 할당하고 슬롯에 바로 복사한다.
+        """
+        if self.cap is None or not self.cap.isOpened():
+            raise RuntimeError("건강성 검사 프레임 수집 실패: 카메라가 열려있지 않음")
+
+        ret, first = self.cap.read()
+        if not ret:
+            raise RuntimeError("건강성 검사 중 CSI 프레임 읽기 실패: index=0")
+        if first.ndim != 3 or first.shape[2] != 3 or first.dtype != np.uint8:
+            raise RuntimeError(
+                f"건강성 검사 프레임 형식 이상: shape={first.shape}, dtype={first.dtype}"
+            )
+
+        buffer = np.empty((window_len,) + first.shape, dtype=np.uint8)
+        buffer[0] = first
+        for index in range(1, window_len):
+            ret, frame = self.cap.read()
+            if not ret:
+                raise RuntimeError(f"건강성 검사 중 CSI 프레임 읽기 실패: index={index}")
+            if frame.shape != first.shape or frame.dtype != np.uint8:
+                raise RuntimeError(
+                    f"건강성 검사 프레임 형식 불일치: index={index}, "
+                    f"shape={frame.shape}, dtype={frame.dtype}"
+                )
+            buffer[index] = frame
+        return buffer
 
     def _check_trigger(self, score: float) -> bool:
         now = time.time()
@@ -895,6 +1210,7 @@ class CameraAnomalyPipeline:
         # __main__에서 VadCLIP보다 먼저 카메라를 선점한 경우 재오픈하지 않는다.
         if self.cap is None or not self.cap.isOpened():
             self.initialize_camera()
+        self.start_auxiliary_services()
         self._running = True
 
         self._upload_thread = threading.Thread(
@@ -910,6 +1226,8 @@ class CameraAnomalyPipeline:
             daemon=True,
         )
         self._inference_thread.start()
+
+        self._periodic_recorder.start()
 
         frame_interval = 1.0 / FPS
         next_tick = time.time()
@@ -979,10 +1297,18 @@ class CameraAnomalyPipeline:
 
     def stop(self) -> None:
         self._running = False
+        # 보조 서비스가 start_auxiliary_services() 호출 전(건강성 gate
+        # 실패/timeout)이면 None이다 - 명시적으로 건너뛰어 idempotent하게
+        # 동작한다(2026-10-07 Codex 검수로 명시된 요구).
+        if self._stream_uploader is not None:
+            try:
+                self._stream_uploader.stop()
+            except Exception:
+                logger.exception("StreamUploader stop 중 예외")
         try:
-            self._stream_uploader.stop()
+            self._periodic_recorder.stop()
         except Exception:
-            logger.exception("StreamUploader stop 중 예외")
+            logger.exception("로컬 주기 녹화 worker stop 중 예외")
 
         if self._upload_busy.is_set():
             logger.warning(
@@ -991,10 +1317,23 @@ class CameraAnomalyPipeline:
             )
 
 
+_startup_health_in_progress = False  # run_startup_health_gate() 실행 중에만 True
+
+
 def _signal_handler(pipeline: CameraAnomalyPipeline):
     def handler(signum, frame):
         logger.info(f"종료 시그널 수신 ({signum}), 정리 중...")
         pipeline.stop()
+        if _startup_health_in_progress:
+            # 기동 건강성 검사 도중 받은 종료 신호는 watchdog의 timeout
+            # SIGTERM일 수 있다. exit 0으로 끝내면 timeout이 정상 운영
+            # 종료로 보인다(2026-10-07 Codex 검수로 발견) - watchdog이 이미
+            # 상태파일에 기록한 status=timeout/attempts는 여기서 다시 쓰지
+            # 않는다(그대로 보존).
+            logger.critical(
+                "🚨 기동 건강성 검사 진행 중 종료 신호 수신 - 비정상 종료(exit 1)"
+            )
+            sys.exit(1)
         sys.exit(0)
     return handler
 
@@ -1016,6 +1355,34 @@ if __name__ == "__main__":
     try:
         pipeline.initialize_camera()
         get_anomaly_pipeline().warmup()
+        h264_warmup_ok = warmup_clip_encoder(UPLOAD_CLIP_WIDTH, UPLOAD_CLIP_HEIGHT, FPS)
+
+        _startup_health_in_progress = True
+        try:
+            health_state = run_startup_health_gate(
+                get_anomaly_pipeline(),
+                pipeline.collect_healthcheck_window,
+                uploader_module,
+                h264_warmup_ok=h264_warmup_ok,
+            )
+        finally:
+            _startup_health_in_progress = False
+        logger.info(
+            "기동 건강성 검사 완료: status=%s active_encoder=%s final_action=%s",
+            health_state["status"], health_state["active_encoder"],
+            health_state["final_action"],
+        )
+
+        if health_state["final_action"] != "pipeline_run":
+            logger.critical(
+                "🚨 VadCLIP 기동 건강성 검사 실패(status=%s) - 추론 루프를 "
+                "시작하지 않고 종료합니다. 자동 재시작은 수행하지 않습니다.",
+                health_state["status"],
+            )
+            uploader_module._stop_persistent_worker()
+            pipeline.release_camera()
+            sys.exit(1)
+
         pipeline.run()
     except Exception:
         pipeline.release_camera()
